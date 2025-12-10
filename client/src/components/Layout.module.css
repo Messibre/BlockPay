@@ -1,0 +1,76 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background-color: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 1rem 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo h1 {
+  font-size: 1.5rem;
+  color: #0066cc;
+}
+
+.nav {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.nav a {
+  color: #333;
+  font-weight: 500;
+}
+
+.nav a:hover {
+  color: #0066cc;
+}
+
+.walletName {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.button {
+  background-color: #0066cc;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.button:hover {
+  background-color: #0052a3;
+}
+
+.main {
+  flex: 1;
+  padding: 2rem 0;
+}
+
+.footer {
+  background-color: #fff;
+  border-top: 1px solid #e0e0e0;
+  padding: 1rem 0;
+  margin-top: auto;
+}
+
+.footer p {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+}
+

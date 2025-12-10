@@ -1,0 +1,13 @@
+[package]
+name = "cardano-escrow"
+version = "0.1.0"
+description = "Escrow validator for Cardano freelance payments"
+
+[dependencies]
+aiken/collection = ">=1.0.0"
+aiken/cardano = ">=1.0.0"
+sian_lab/vodka = ">=1.0.0"
+
+[compiler]
+test = true
+

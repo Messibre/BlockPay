@@ -1,0 +1,12 @@
+# Build artifacts
+build/
+*.plutus
+*.cbor
+
+# Aiken cache
+.aiken/
+
+# IDE
+.vscode/
+.idea/
+
