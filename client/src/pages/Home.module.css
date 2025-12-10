@@ -60,6 +60,87 @@
   text-decoration: none;
 }
 
+.buttonTertiary {
+  background-color: transparent;
+  color: #0066cc;
+  padding: 0.75rem 2rem;
+  border-radius: 4px;
+  font-weight: 500;
+  border: 1px solid #0066cc;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.buttonTertiary:hover {
+  background-color: #f0f8ff;
+  text-decoration: none;
+}
+
+.welcomeSection {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.welcomeSection h2 {
+  color: #0066cc;
+  margin-bottom: 1rem;
+}
+
+.userInfo {
+  color: #666;
+  margin: 1rem 0;
+  line-height: 1.8;
+}
+
+.userInfo code {
+  background: #f0f0f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.walletStatus {
+  color: #28a745;
+  margin: 1rem 0;
+  font-weight: 500;
+}
+
+.walletStatus code {
+  background: #e8f5e9;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.walletPrompt {
+  margin-top: 3rem;
+  padding: 2rem;
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.walletPrompt h2 {
+  color: #856404;
+  margin-bottom: 1rem;
+}
+
+.walletPrompt p {
+  color: #856404;
+  margin: 0.5rem 0;
+}
+
+.walletHint {
+  font-style: italic;
+  margin-top: 1rem;
+}
+
 .features {
   padding: 4rem 0;
 }
@@ -91,4 +172,3 @@
 .feature p {
   color: #666;
 }
-

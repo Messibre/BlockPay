@@ -1,0 +1,265 @@
+.manageJob {
+  min-height: calc(100vh - 200px);
+  padding: 2rem 0;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.loadingContainer {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.loadingContainer p {
+  margin-top: 1rem;
+  color: #666;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header h1 {
+  margin: 0;
+  color: #0066cc;
+}
+
+.stats {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.statLabel {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.statValue {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #0066cc;
+}
+
+.proposalsSection {
+  margin-top: 2rem;
+}
+
+.proposalsSection h2 {
+  margin-top: 0;
+  color: #333;
+}
+
+.empty {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.proposalsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.proposalCard {
+  border: 1px solid #e0e0e0;
+}
+
+.proposalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.proposalHeader h3 {
+  margin: 0;
+  color: #0066cc;
+}
+
+.proposalBid {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.proposalBid strong {
+  color: #0066cc;
+}
+
+.proposalTimeline {
+  margin: 0.25rem 0;
+  color: #666;
+}
+
+.status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status.accepted {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status.rejected {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.proposalContent {
+  margin: 1rem 0;
+}
+
+.coverLetter {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  white-space: pre-wrap;
+}
+
+.portfolioLinks {
+  margin: 1rem 0;
+}
+
+.portfolioLinks strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.link {
+  display: block;
+  color: #0066cc;
+  text-decoration: none;
+  margin: 0.25rem 0;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.proposalMeta {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.date {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.proposalActions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.contractLink {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.proposalSummary {
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.proposalSummary p {
+  margin: 0.5rem 0;
+}
+
+.helpText {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.milestoneForm {
+  margin-bottom: 1rem;
+  padding: 1.5rem;
+}
+
+.milestoneHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.milestoneHeader h4 {
+  margin: 0;
+  color: #333;
+}
+
+.addMilestoneBtn {
+  margin-bottom: 1.5rem;
+}
+
+.modalActions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .proposalHeader {
+    flex-direction: column;
+  }
+
+  .proposalActions {
+    flex-direction: column;
+  }
+
+  .modalActions {
+    flex-direction: column;
+  }
+}

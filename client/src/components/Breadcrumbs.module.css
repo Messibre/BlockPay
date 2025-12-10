@@ -1,0 +1,39 @@
+.breadcrumbs {
+  margin-bottom: 1.5rem;
+}
+
+.list {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.link {
+  color: #0066cc;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.current {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.separator {
+  color: #999;
+  font-size: 0.9rem;
+}

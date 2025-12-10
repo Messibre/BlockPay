@@ -1,0 +1,77 @@
+.submitProposal {
+  min-height: calc(100vh - 200px);
+  padding: 2rem 0;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.loadingContainer,
+.errorContainer {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.loadingContainer p {
+  margin-top: 1rem;
+  color: #666;
+}
+
+.errorContainer h2 {
+  color: #c33;
+  margin-bottom: 1rem;
+}
+
+.jobInfo {
+  background-color: #f9f9f9;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.jobInfo h2 {
+  margin: 0 0 0.5rem 0;
+  color: #0066cc;
+}
+
+.budget {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #0066cc;
+  margin: 0.5rem 0;
+}
+
+.description {
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.form {
+  margin-top: 2rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}
