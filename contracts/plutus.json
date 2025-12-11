@@ -1,0 +1,249 @@
+{
+  "preamble": {
+    "title": "messi/cardano-escrow",
+    "description": "Escrow validator for Cardano freelance payments",
+    "version": "0.1.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.19+e525483"
+    }
+  },
+  "validators": [
+    {
+      "title": "escrow.escrow.spend",
+      "datum": {
+        "title": "datum_opt",
+        "schema": {
+          "$ref": "#/definitions/escrow~1EscrowDatum"
+        }
+      },
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/escrow~1EscrowRedeemer"
+        }
+      },
+      "compiledCode": "5903b101010029800aba2aba1aba0aab9faab9eaab9dab9a488888896600264653001300800198041804800cdc3a400530080024888966002600460106ea800e3300130093754007370e90024dc3a400d370e90004c020dd5002244444646644b300130050048acc004c044dd5006400a2c80922b3001300a004899192cc004c05c00a0091640506eb8c054004c044dd50064566002600e0091323259800980b80140122c80a0dd7180a80098089baa00c8acc004c0180122b3001301137540190028b20248acc004cdc3a401000913259800980b000c4c8c9660026010003159800980a1baa002802c590154566002601a0031323259800980d001401e2c80b8dd6980c000980a1baa0028acc004c0280062b3001301437540050058b202a8acc004c02400626464b3001301a002803c590171bad3018001301437540051640488091012202430123754002602a00316404c60226ea80322c807900f201e403c80785660026006601c6ea8006330013012300f375400337586024601e6ea801e44646600200200644b30010018a508acc004cdc79bae30160010038a51899801001180b800a0224051300e375401491112cc004c01c00629463300123017301830180019180b980c180c180c000c88c8cc00400400c896600200314c103d87a80008992cc004cdc79bae301b3018375400200913374a90001980d000a5eb82266006006603800480b0c0680050182444b3001300f0048acc004cc014018dd7180c980b1baa0078992cc004c02cc058dd5000c5660026020602c6ea8c010c05cdd5180d180b9baa0018a508a51405514a080a8cc004dd61801180b1baa007375c6032602c6ea8046294101444c966002601a00b159800998030039bae300130173754011132598009806180b9baa00189808980b9baa300530183754603660306ea80062941016198011bac3003301737540106eb8c068c05cdd50094528202a8acc004c0300162b300133006007375c6034602e6ea80222b300132330010013758600860306ea8024896600200314a11598009809180c1baa300630193754603800314a3133002002301d001405c80d2264b3001300c301737540031337106eb4c06cc060dd50009bad301b30183754600460306ea80422941016180d180d980d980d980d980d980d980d980b9baa0088a51405514a080aa264b300133007008375c60366038603860386038603860386038603860306ea802629462941016180d180b9baa012405480a88c068c06c005014101122c8068c048018c044c04801516401c300800130033754011149a26cac80081",
+      "hash": "2fce998d79a8d27272f8b78f4e03370753520537e6cf8dd246528782"
+    },
+    {
+      "title": "escrow.escrow.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "compiledCode": "5903b101010029800aba2aba1aba0aab9faab9eaab9dab9a488888896600264653001300800198041804800cdc3a400530080024888966002600460106ea800e3300130093754007370e90024dc3a400d370e90004c020dd5002244444646644b300130050048acc004c044dd5006400a2c80922b3001300a004899192cc004c05c00a0091640506eb8c054004c044dd50064566002600e0091323259800980b80140122c80a0dd7180a80098089baa00c8acc004c0180122b3001301137540190028b20248acc004cdc3a401000913259800980b000c4c8c9660026010003159800980a1baa002802c590154566002601a0031323259800980d001401e2c80b8dd6980c000980a1baa0028acc004c0280062b3001301437540050058b202a8acc004c02400626464b3001301a002803c590171bad3018001301437540051640488091012202430123754002602a00316404c60226ea80322c807900f201e403c80785660026006601c6ea8006330013012300f375400337586024601e6ea801e44646600200200644b30010018a508acc004cdc79bae30160010038a51899801001180b800a0224051300e375401491112cc004c01c00629463300123017301830180019180b980c180c180c000c88c8cc00400400c896600200314c103d87a80008992cc004cdc79bae301b3018375400200913374a90001980d000a5eb82266006006603800480b0c0680050182444b3001300f0048acc004cc014018dd7180c980b1baa0078992cc004c02cc058dd5000c5660026020602c6ea8c010c05cdd5180d180b9baa0018a508a51405514a080a8cc004dd61801180b1baa007375c6032602c6ea8046294101444c966002601a00b159800998030039bae300130173754011132598009806180b9baa00189808980b9baa300530183754603660306ea80062941016198011bac3003301737540106eb8c068c05cdd50094528202a8acc004c0300162b300133006007375c6034602e6ea80222b300132330010013758600860306ea8024896600200314a11598009809180c1baa300630193754603800314a3133002002301d001405c80d2264b3001300c301737540031337106eb4c06cc060dd50009bad301b30183754600460306ea80422941016180d180d980d980d980d980d980d980d980b9baa0088a51405514a080aa264b300133007008375c60366038603860386038603860386038603860306ea802629462941016180d180b9baa012405480a88c068c06c005014101122c8068c048018c044c04801516401c300800130033754011149a26cac80081",
+      "hash": "2fce998d79a8d27272f8b78f4e03370753520537e6cf8dd246528782"
+    }
+  ],
+  "definitions": {
+    "Bool": {
+      "title": "Bool",
+      "anyOf": [
+        {
+          "title": "False",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "True",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "ByteArray": {
+      "dataType": "bytes"
+    },
+    "Int": {
+      "dataType": "integer"
+    },
+    "List$escrow/Milestone": {
+      "dataType": "list",
+      "items": {
+        "$ref": "#/definitions/escrow~1Milestone"
+      }
+    },
+    "Option$Int": {
+      "title": "Option",
+      "anyOf": [
+        {
+          "title": "Some",
+          "description": "An optional value.",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        },
+        {
+          "title": "None",
+          "description": "Nothing.",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "escrow/ArbitrateDecision": {
+      "title": "ArbitrateDecision",
+      "anyOf": [
+        {
+          "title": "PayFull",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "PayPartial",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        },
+        {
+          "title": "RefundFull",
+          "dataType": "constructor",
+          "index": 2,
+          "fields": []
+        },
+        {
+          "title": "RefundPartial",
+          "dataType": "constructor",
+          "index": 3,
+          "fields": [
+            {
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "escrow/EscrowDatum": {
+      "title": "EscrowDatum",
+      "anyOf": [
+        {
+          "title": "EscrowDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "client",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "freelancer",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "total_amount",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "milestones",
+              "$ref": "#/definitions/List$escrow~1Milestone"
+            },
+            {
+              "title": "contract_nonce",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "fee_percent",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "fee_address",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "expiration",
+              "$ref": "#/definitions/Option$Int"
+            },
+            {
+              "title": "arbitrator",
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        }
+      ]
+    },
+    "escrow/EscrowRedeemer": {
+      "title": "EscrowRedeemer",
+      "anyOf": [
+        {
+          "title": "Deposit",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "Release",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        },
+        {
+          "title": "Withdraw",
+          "dataType": "constructor",
+          "index": 2,
+          "fields": [
+            {
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        },
+        {
+          "title": "Refund",
+          "dataType": "constructor",
+          "index": 3,
+          "fields": []
+        },
+        {
+          "title": "Arbitrate",
+          "dataType": "constructor",
+          "index": 4,
+          "fields": [
+            {
+              "$ref": "#/definitions/escrow~1ArbitrateDecision"
+            }
+          ]
+        }
+      ]
+    },
+    "escrow/Milestone": {
+      "title": "Milestone",
+      "anyOf": [
+        {
+          "title": "Milestone",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "id",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "amount",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "paid",
+              "$ref": "#/definitions/Bool"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

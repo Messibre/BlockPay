@@ -1,13 +1,8 @@
-[package]
-name = "cardano-escrow"
+# dependencies removed to allow offline/local-only build
+# { name = "aiken/collection", version = ">=1.0.0", source = "github" },
+# { name = "aiken/cardano", version = ">=1.0.0", source = "github" },
+# { name = "sian_lab/vodka", version = ">=1.0.0", source = "github" },
+name = "messi/cardano-escrow"
 version = "0.1.0"
 description = "Escrow validator for Cardano freelance payments"
-
-[dependencies]
-aiken/collection = ">=1.0.0"
-aiken/cardano = ">=1.0.0"
-sian_lab/vodka = ">=1.0.0"
-
-[compiler]
-test = true
 

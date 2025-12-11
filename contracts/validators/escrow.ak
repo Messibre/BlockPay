@@ -4,43 +4,43 @@
 
 use aiken/collection/list
 use cardano/transaction.{OutputReference, Transaction, placeholder}
-use sian_lab/vodka/mocktail
+use sian_lab/vodka/mocktail.{mock_utxo_ref}
 
 // Datum structure stored on-chain
 pub type EscrowDatum {
-  client: ByteArray          // Client's pubkeyhash
-  freelancer: ByteArray      // Freelancer's pubkeyhash
-  total_amount: Int          // Total escrow amount in lovelace
-  milestones: List<Milestone> // List of milestones with amounts
-  contract_nonce: Int        // Unique contract identifier
-  fee_percent: Int           // Platform fee in basis points (100 = 1%)
-  fee_address: ByteArray     // Platform fee recipient pubkeyhash
-  expiration: Option<Int>   // Optional expiration timestamp (POSIXTime)
-  arbitrator: ByteArray      // Arbitrator pubkeyhash for disputes
+  client: ByteArray,          // Client's pubkeyhash
+  freelancer: ByteArray,      // Freelancer's pubkeyhash
+  total_amount: Int,          // Total escrow amount in lovelace
+  milestones: List<Milestone>, // List of milestones with amounts
+  contract_nonce: Int,        // Unique contract identifier
+  fee_percent: Int,           // Platform fee in basis points (100 = 1%)
+  fee_address: ByteArray,     // Platform fee recipient pubkeyhash
+  expiration: Option<Int>,    // Optional expiration timestamp (POSIXTime)
+  arbitrator: ByteArray,      // Arbitrator pubkeyhash for disputes
 }
 
 // Milestone structure
 pub type Milestone {
-  id: ByteArray              // Unique milestone identifier
-  amount: Int                // Amount in lovelace for this milestone
-  paid: Bool                 // Whether this milestone has been paid
+  id: ByteArray,             // Unique milestone identifier
+  amount: Int,               // Amount in lovelace for this milestone
+  paid: Bool,                // Whether this milestone has been paid
 }
 
 // Redeemer actions
 pub type EscrowRedeemer {
   Deposit                   // Initial deposit (no validation needed)
-  Release(milestone_id: ByteArray)  // Client approves milestone
-  Withdraw(milestone_id: ByteArray) // Freelancer withdraws released funds
+  Release(ByteArray)        // Client approves milestone (milestone id)
+  Withdraw(ByteArray)       // Freelancer withdraws released funds (milestone id)
   Refund                    // Client requests refund
-  Arbitrate(decision: ArbitrateDecision) // Admin/arbitrator resolves dispute
+  Arbitrate(ArbitrateDecision) // Admin/arbitrator resolves dispute
 }
 
 // Arbitration decision types
 pub type ArbitrateDecision {
   PayFull                   // Pay freelancer full amount
-  PayPartial(amount: Int)  // Pay freelancer partial amount
+  PayPartial(Int)           // Pay freelancer partial amount
   RefundFull                // Refund client full amount
-  RefundPartial(amount: Int) // Refund client partial amount
+  RefundPartial(Int)        // Refund client partial amount
 }
 
 // Main validator
@@ -209,24 +209,24 @@ fn has_paid_milestone(milestones: List<Milestone>) -> Bool {
 
 // Test helpers
 fn sample_client() -> ByteArray {
-  #"client_pubkeyhash_here"
+  #"a1"
 }
 
 fn sample_freelancer() -> ByteArray {
-  #"freelancer_pubkeyhash_here"
+  #"b2"
 }
 
 fn sample_arbitrator() -> ByteArray {
-  #"arbitrator_pubkeyhash_here"
+  #"c3"
 }
 
 fn sample_fee_address() -> ByteArray {
-  #"fee_address_pubkeyhash_here"
+  #"d4"
 }
 
 fn sample_milestone() -> Milestone {
   Milestone {
-    id: #"milestone_1",
+    id: #"01",
     amount: 5000000,  // 5 ADA
     paid: False,
   }
@@ -256,7 +256,7 @@ fn sample_transaction(signatories: List<ByteArray>) -> Transaction {
 // Tests
 test client_can_release_milestone() {
   let datum = Some(sample_datum())
-  let redeemer = Release(#"milestone_1")
+  let redeemer = Release(#"01")
   let tx = sample_transaction([sample_client()])
   let input = mock_utxo_ref(0, 0)
   
@@ -265,15 +265,15 @@ test client_can_release_milestone() {
 
 test freelancer_can_withdraw_after_release() {
   let milestone = Milestone {
-    id: #"milestone_1",
+    id: #"01",
     amount: 5000000,
-    paid: True,  // Already released
+    paid: True,  // already released
   }
   let datum = Some(EscrowDatum {
     ..sample_datum(),
     milestones: [milestone],
   })
-  let redeemer = Withdraw(#"milestone_1")
+  let redeemer = Withdraw(#"01")
   let tx = sample_transaction([sample_freelancer()])
   let input = mock_utxo_ref(0, 0)
   
@@ -299,8 +299,8 @@ test arbitrator_can_resolve_dispute() {
 }
 
 test freelancer_cannot_withdraw_without_release() {
-  let datum = Some(sample_datum())  // Milestone not paid
-  let redeemer = Withdraw(#"milestone_1")
+  let datum = Some(sample_datum())  // milestone not paid
+  let redeemer = Withdraw(#"01")
   let tx = sample_transaction([sample_freelancer()])
   let input = mock_utxo_ref(0, 0)
   
@@ -309,7 +309,7 @@ test freelancer_cannot_withdraw_without_release() {
 
 test client_cannot_release_without_signing() {
   let datum = Some(sample_datum())
-  let redeemer = Release(#"milestone_1")
+  let redeemer = Release(#"01")
   let tx = sample_transaction([])  // No signatories
   let input = mock_utxo_ref(0, 0)
   
@@ -318,14 +318,14 @@ test client_cannot_release_without_signing() {
 
 test client_cannot_refund_when_milestones_paid() {
   let milestone = Milestone {
-    id: #"milestone_1",
+    id: #"01",
     amount: 5000000,
     paid: True,  // Milestone already paid
   }
   let datum = Some(EscrowDatum {
     ..sample_datum(),
     milestones: [milestone],
-    expiration: None,  // No expiration
+    expiration: None,  
   })
   let redeemer = Refund
   let tx = sample_transaction([sample_client()])

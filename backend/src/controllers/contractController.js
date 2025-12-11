@@ -4,9 +4,8 @@ import Payment from '../models/Payment.js';
 
 // Generate contract address (simplified - in production, derive from validator)
 const generateContractAddress = () => {
-  // This should be derived from the compiled Aiken validator
-  // For now, return a placeholder
-  return `addr_test1${Math.random().toString(36).substring(7)}`;
+ 
+  return 'addr_test1wqhuaxvd0x5dyunjlzmc7nsrxur4x5s9xlnvlrwjgefg0qstf3kqv'
 };
 
 export const createContract = async (req, res, next) => {
