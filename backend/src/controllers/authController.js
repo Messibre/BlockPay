@@ -10,7 +10,7 @@ export const register = async (req, res, next) => {
   try {
     const { email, password, displayName, role, walletAddress } = req.body;
 
-    if (!displayName || !role || !walletAddress) {
+    if (!displayName || !role) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -21,21 +21,34 @@ export const register = async (req, res, next) => {
       }
     }
 
-    const existingWallet = await User.findOne({ walletAddress });
-    if (existingWallet) {
-      return res.status(409).json({ message: 'Wallet already registered' });
+    // Only check for existing wallet if walletAddress is provided
+    const isValidAddress = (a) => typeof a === 'string' && /^(addr1|addr_test1)[0-9a-z]+$/.test(a);
+    if (walletAddress) {
+      if (!isValidAddress(walletAddress)) {
+        return res.status(400).json({ message: 'Invalid wallet address format' });
+      }
+      const existingWallet = await User.findOne({ walletAddress });
+      if (existingWallet) {
+        return res.status(409).json({ message: 'Wallet already registered' });
+      }
     }
 
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
 
-    const user = new User({
+    const userData = {
       fullName: displayName,
       email: email || null,
       passwordHash,
       role,
-      walletAddress,
-      wallets: [{ address: walletAddress, isPrimary: true }],
-    });
+      walletAddress: walletAddress || null,
+    };
+
+    // Only add wallets array if walletAddress is provided
+    if (walletAddress) {
+      userData.wallets = [{ address: walletAddress, isPrimary: true }];
+    }
+
+    const user = new User(userData);
 
     await user.save();
 
@@ -99,6 +112,10 @@ export const verifyWallet = async (req, res, next) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
+    const isValidAddress = (a) => typeof a === 'string' && /^(addr1|addr_test1)[0-9a-z]+$/.test(a);
+    if (!isValidAddress(address)) {
+      return res.status(400).json({ message: 'Invalid wallet address format' });
+    }
     // TODO: Verify signature matches address using CIP-30 verification
     // For now, we'll trust the wallet connection and create/link user
 

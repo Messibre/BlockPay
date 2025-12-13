@@ -1,70 +1,90 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useWallet } from "@meshsdk/react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useToast } from "../contexts/ToastContext.jsx";
+import Footer from "./Footer.jsx";
 import styles from "./Layout.module.css";
 
 export default function Layout({ children }) {
   const { connected, connect, disconnect, name } = useWallet();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
-  const { success } = useToast();
+  const { success, error: showError } = useToast();
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
 
-  const handleConnect = async () => {
-    try {
-      // Check for installed Cardano wallets
-      const walletNames = ["nami", "eternl", "lace", "flint", "gero", "typhon"];
-      const installedWallets = walletNames.filter(
-        (name) => window.cardano?.[name]
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
+  const walletNames = [
+    { id: "nami", name: "Nami Wallet" },
+    { id: "eternl", name: "Eternl Wallet" },
+    { id: "lace", name: "Lace Wallet" },
+    { id: "flint", name: "Flint Wallet" },
+    { id: "gero", name: "Gero Wallet" },
+    { id: "typhon", name: "Typhon Wallet" },
+  ];
+
+  const getInstalledWallets = () => {
+    return walletNames.filter((wallet) => window.cardano?.[wallet.id]);
+  };
+
+  const handleConnectClick = () => {
+    if (!isAuthenticated) {
+      showError("Please login first to connect your wallet");
+      navigate("/login");
+      return;
+    }
+
+    const installedWallets = getInstalledWallets();
+    if (installedWallets.length === 0) {
+      alert(
+        "Please install a Cardano wallet extension:\n\n" +
+          "• Nami Wallet\n" +
+          "• Eternl Wallet\n" +
+          "• Lace Wallet\n" +
+          "• Flint Wallet\n" +
+          "• Gero Wallet\n" +
+          "• Typhon Wallet\n\n" +
+          "After installing, refresh the page and try again."
       );
+      return;
+    }
 
-      if (installedWallets.length === 0) {
-        alert(
-          "Please install a Cardano wallet extension:\n\n" +
-            "• Nami Wallet\n" +
-            "• Eternl Wallet\n" +
-            "• Lace Wallet\n" +
-            "• Flint Wallet\n" +
-            "• Gero Wallet\n\n" +
-            "After installing, refresh the page and try again."
-        );
-        return;
-      }
+    setShowWalletModal(true);
+  };
 
-      // Try connecting to each wallet until one works
-      let connectedWallet = null;
-      for (const walletName of installedWallets) {
-        try {
-          console.log(`Attempting to connect to ${walletName}...`);
-          await connect(walletName);
-          connectedWallet = walletName;
-          console.log(`Successfully connected to ${walletName}`);
-          break;
-        } catch (err) {
-          console.log(`${walletName} connection failed:`, err.message);
-          // Continue to next wallet
-          continue;
-        }
-      }
-
-      if (!connectedWallet) {
-        alert(
-          "Failed to connect to any wallet. Please:\n\n" +
-            "1. Make sure your wallet extension is unlocked\n" +
-            "2. Try refreshing the page\n" +
-            "3. Check if the wallet is enabled in your browser"
-        );
-      }
+  const handleWalletSelect = async (walletId) => {
+    try {
+      setShowWalletModal(false);
+      await connect(walletId);
+      success(
+        `Successfully connected to ${
+          walletNames.find((w) => w.id === walletId)?.name || walletId
+        }`
+      );
     } catch (error) {
       console.error("Wallet connection error:", error);
-      alert(
-        `Wallet connection failed: ${error.message || "Unknown error"}\n\n` +
-          "Please ensure your wallet extension is installed and unlocked."
+      showError(
+        `Failed to connect to wallet: ${error.message || "Unknown error"}\n\n` +
+          "Please ensure your wallet extension is unlocked."
       );
     }
   };
 
   const handleDisconnect = () => {
+    if (!isAuthenticated) {
+      showError("Please login first");
+      navigate("/login");
+      return;
+    }
     disconnect();
     navigate("/");
   };
@@ -79,13 +99,10 @@ export default function Layout({ children }) {
     <div className={styles.layout}>
       <header className={styles.header}>
         <div className={styles.container}>
-          {/* <Link to="/" className={styles.logo}>
-            <h1>Cardano Escrow</h1>
-          </Link> */}
+          <Link to="/" className={styles.logo}>
+            <h1>BlockPay</h1>
+          </Link>
           <nav className={styles.nav}>
-            <Link to="/" className={styles.logo}>
-              <h1>Cardano Escrow</h1>
-            </Link>
             <div className={styles.navLinks}>
               <Link to="/jobs">Jobs</Link>
               {isAuthenticated ? (
@@ -123,6 +140,15 @@ export default function Layout({ children }) {
                 </>
               )}
             </div>
+            
+            <button onClick={toggleTheme} className={styles.themeToggle} aria-label="Toggle theme">
+                {theme === 'dark' ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                )}
+            </button>
+
             <div className={styles.walletSection}>
               {connected ? (
                 <>
@@ -135,7 +161,10 @@ export default function Layout({ children }) {
                   </button>
                 </>
               ) : (
-                <button onClick={handleConnect} className={styles.buttonSmall}>
+                <button
+                  onClick={handleConnectClick}
+                  className={styles.buttonSmall}
+                >
                   Connect Wallet
                 </button>
               )}
@@ -143,12 +172,45 @@ export default function Layout({ children }) {
           </nav>
         </div>
       </header>
-      <main className={styles.main}>{children}</main>
-      <footer className={styles.footer}>
-        <div className={styles.container}>
-          <p>Cardano Freelance Escrow - Secure payments on blockchain</p>
+      {showWalletModal && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowWalletModal(false)}
+        >
+          <div
+            className={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h2>Select Wallet</h2>
+              <button
+                className={styles.modalClose}
+                onClick={() => setShowWalletModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className={styles.walletList}>
+              {getInstalledWallets().map((wallet) => (
+                <button
+                  key={wallet.id}
+                  className={styles.walletOption}
+                  onClick={() => handleWalletSelect(wallet.id)}
+                >
+                  {wallet.name}
+                </button>
+              ))}
+            </div>
+            {getInstalledWallets().length === 0 && (
+              <p className={styles.noWallets}>
+                No wallets detected. Please install a Cardano wallet extension.
+              </p>
+            )}
+          </div>
         </div>
-      </footer>
+      )}
+      <main className={styles.main}>{children}</main>
+      <Footer />
     </div>
   );
 }

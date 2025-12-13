@@ -83,9 +83,9 @@ export default {
     api.post(`/proposals/${proposalId}/reject`).then((res) => res.data),
 
   // Contract actions
-  approveMilestone: (contractId, milestoneId, data) =>
+  approveMilestone: (contractId, milestoneId, txHash) =>
     api
-      .post(`/contracts/${contractId}/milestones/${milestoneId}/approve`, data)
+      .post(`/contracts/${contractId}/milestones/${milestoneId}/approve`, { txHash })
       .then((res) => res.data),
   submitMilestone: (contractId, milestoneId, data) =>
     api
@@ -100,4 +100,7 @@ export default {
   getTxStatus: (txHash) => api.get(`/tx/${txHash}`).then((res) => res.data),
   getScriptUtxos: (address) =>
     api.get(`/script/${address}/utxos`).then((res) => res.data),
+
+  // Dashboard
+  getDashboardStats: () => api.get("/dashboard/stats").then((res) => res.data),
 };

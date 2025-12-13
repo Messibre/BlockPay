@@ -1,154 +1,184 @@
 .home {
-  min-height: calc(100vh - 200px);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Background Decoration */
+.home::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -10%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, var(--accent-primary) 0%, transparent 70%);
+  opacity: 0.15;
+  filter: blur(100px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.home::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  right: -10%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, var(--accent-secondary) 0%, transparent 70%);
+  opacity: 0.15;
+  filter: blur(100px);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .container {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 4rem 1.5rem;
 }
 
 .hero {
   text-align: center;
-  padding: 4rem 0;
+  margin-bottom: 6rem;
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .hero h1 {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  color: #0066cc;
+  font-size: 4rem;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  line-height: 1.1;
+  background: linear-gradient(135deg, var(--text-primary) 30%, var(--accent-primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .tagline {
-  font-size: 1.25rem;
-  color: #666;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin: 0 auto 3rem;
+  line-height: 1.5;
+}
+
+.welcomeSection {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  padding: 2.5rem;
+  border-radius: var(--radius-lg);
+  display: inline-block;
+  text-align: left;
+  min-width: 350px;
+  box-shadow: var(--glass-shadow);
+}
+
+.welcomeSection h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.userInfo {
+  margin-bottom: 1.5rem;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.userInfo strong {
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.userInfo code {
+  background: rgba(0,0,0,0.2);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.walletStatus {
   margin-bottom: 2rem;
+  color: var(--success);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .actions {
   display: flex;
   gap: 1rem;
   justify-content: center;
+  flex-wrap: wrap;
+}
+
+.button, .buttonSecondary, .buttonTertiary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  font-size: 1.1rem;
+  transition: all 0.2s;
+  min-width: 160px;
 }
 
 .button {
-  background-color: #0066cc;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
   color: white;
-  padding: 0.75rem 2rem;
-  border-radius: 4px;
-  font-weight: 500;
-  display: inline-block;
+  box-shadow: 0 4px 6px -1px var(--accent-glow);
 }
 
 .button:hover {
-  background-color: #0052a3;
-  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px var(--accent-glow);
 }
 
 .buttonSecondary {
-  background-color: white;
-  color: #0066cc;
-  padding: 0.75rem 2rem;
-  border-radius: 4px;
-  font-weight: 500;
-  border: 2px solid #0066cc;
-  display: inline-block;
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .buttonSecondary:hover {
-  background-color: #f0f0f0;
-  text-decoration: none;
+  background: rgba(99, 102, 241, 0.1);
+  transform: translateY(-2px);
 }
 
 .buttonTertiary {
-  background-color: transparent;
-  color: #0066cc;
-  padding: 0.75rem 2rem;
-  border-radius: 4px;
-  font-weight: 500;
-  border: 1px solid #0066cc;
-  display: inline-block;
-  text-decoration: none;
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .buttonTertiary:hover {
-  background-color: #f0f8ff;
-  text-decoration: none;
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
-.welcomeSection {
-  margin-top: 2rem;
-  padding: 2rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.welcomeSection h2 {
-  color: #0066cc;
-  margin-bottom: 1rem;
-}
-
-.userInfo {
-  color: #666;
-  margin: 1rem 0;
-  line-height: 1.8;
-}
-
-.userInfo code {
-  background: #f0f0f0;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.9em;
-}
-
-.walletStatus {
-  color: #28a745;
-  margin: 1rem 0;
-  font-weight: 500;
-}
-
-.walletStatus code {
-  background: #e8f5e9;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.9em;
-}
-
-.walletPrompt {
-  margin-top: 3rem;
-  padding: 2rem;
-  background: #fff3cd;
-  border: 2px solid #ffc107;
-  border-radius: 8px;
-  text-align: center;
-}
-
-.walletPrompt h2 {
-  color: #856404;
-  margin-bottom: 1rem;
-}
-
-.walletPrompt p {
-  color: #856404;
-  margin: 0.5rem 0;
-}
-
-.walletHint {
-  font-style: italic;
-  margin-top: 1rem;
-}
-
+/* Features Section */
 .features {
-  padding: 4rem 0;
+  margin-top: 4rem;
 }
 
 .features h2 {
   text-align: center;
-  font-size: 2rem;
+  font-size: 2.5rem;
   margin-bottom: 3rem;
+  color: var(--text-primary);
 }
 
 .featureGrid {
@@ -158,17 +188,72 @@
 }
 
 .feature {
-  background: white;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature:hover {
+  transform: translateY(-5px);
+  border-color: var(--accent-primary);
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.2);
 }
 
 .feature h3 {
-  color: #0066cc;
-  margin-bottom: 0.5rem;
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
 }
 
 .feature p {
-  color: #666;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.walletPrompt {
+  margin-top: 6rem;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+  padding: 4rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-color);
+}
+
+.walletPrompt h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.walletPrompt p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.walletHint {
+  font-size: 0.9rem !important;
+  color: var(--text-tertiary) !important;
+  margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2.5rem;
+  }
+  
+  .tagline {
+    font-size: 1.1rem;
+  }
+  
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .button, .buttonSecondary, .buttonTertiary {
+    width: 100%;
+  }
 }

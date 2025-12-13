@@ -14,12 +14,27 @@ function ClientDashboardContent() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   // Mock data - replace with actual API calls
-  const stats = {
-    activeJobs: 3,
-    pendingContracts: 2,
-    completedContracts: 5,
-    totalPaid: 12500,
-  };
+  // Fetch dashboard stats from backend
+  const {
+    data: stats,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["dashboardStats"],
+    queryFn: api.getDashboardStats,
+    initialData: {
+      activeJobs: 0,
+      pendingContracts: 0,
+      completedContracts: 0,
+      totalPaid: 0,
+    },
+  });
+
+  if (isLoading) return <LoadingSpinner />;
+  if (error) {
+    console.error("Failed to load dashboard stats:", error);
+    // Continue with initialData or show alert - for now just log
+  }
 
   const notifications = [
     {

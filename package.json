@@ -5,8 +5,10 @@
   "private": true,
   "scripts": {
     "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "dev:client": "cd client && npm run dev",
+    "install:all": "cd backend && npm install && cd ../client && npm install",
+    "vercel:deploy:client": "cd client && vercel --prod",
+    "vercel:deploy:backend": "cd backend && vercel --prod",
     "build:contracts": "node scripts/build-contracts.js",
     "seed": "node scripts/seed.js"
   },
@@ -19,4 +21,3 @@
   "author": "",
   "license": "MIT"
 }
-

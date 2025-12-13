@@ -1,133 +1,250 @@
 .layout {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
 }
 
 .header {
-  background-color: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1rem 0;
+  height: var(--nav-height);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(11, 17, 32, 0.85); /* Fallback for no support */
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
 }
 
 .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
+}
+
+.logo {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .logo h1 {
   font-size: 1.5rem;
-  color: #0066cc;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  letter-spacing: -0.5px;
 }
 
 .nav {
   display: flex;
-  gap: 1.5rem;
   align-items: center;
-  width: 100%;
-  justify-content: space-between;
+  gap: 2rem;
 }
 
 .navLinks {
   display: flex;
-  gap: 1.5rem;
   align-items: center;
-  flex: 1;
-  justify-content: center;
+  gap: 1.5rem;
 }
 
 .navLinks a {
-  color: #333;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.navLinks a:hover {
-  color: #0066cc;
-}
-
-.walletSection {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.walletName {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.userName {
-  color: #333;
-  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
   font-weight: 500;
 }
 
-.button {
-  background-color: #0066cc;
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-
-.button:hover {
-  background-color: #0052a3;
-}
-
-.buttonSecondary {
-  background-color: transparent;
-  color: #0066cc;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-weight: 500;
-  border: 1px solid #0066cc;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-
-.buttonSecondary:hover {
-  background-color: #f0f7ff;
-}
-
-.buttonSmall {
-  background-color: #0066cc;
-  color: white;
-  padding: 0.4rem 0.8rem;
-  border-radius: 4px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.buttonSmall:hover {
-  background-color: #0052a3;
+.navLinks a:hover,
+.navLinks a.active {
+  color: var(--text-primary);
 }
 
 .main {
   flex: 1;
-  padding: 2rem 0;
+  width: 100%;
+  padding-top: 2rem;
+  padding-bottom: 4rem;
 }
 
-.footer {
-  background-color: #fff;
-  border-top: 1px solid #e0e0e0;
-  padding: 1rem 0;
-  margin-top: auto;
+.walletSection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-left: 1.5rem;
+  border-left: 1px solid var(--border-color);
 }
 
-.footer p {
-  text-align: center;
-  color: #666;
+.walletName {
   font-size: 0.9rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  background: var(--bg-tertiary);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.button {
+  background: var(--accent-primary);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.button:hover {
+  background: var(--accent-primary-hover);
+}
+
+.buttonSecondary {
+  background: transparent;
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.buttonSecondary:hover {
+  background: var(--bg-tertiary);
+}
+
+.buttonSmall {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
+  color: white;
+  border: none;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.buttonSmall:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+}
+
+.userName {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Wallet Modal */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--glass-border);
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modalHeader h2 {
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  padding: 4px;
+}
+
+.modalClose:hover {
+  color: var(--text-primary);
+}
+
+.walletList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.walletOption {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-align: left;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.walletOption:hover {
+  border-color: var(--accent-primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.noWallets {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 20px 0;
+  line-height: 1.5;
+}
+
+/* Theme Toggle */
+.themeToggle {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: color 0.2s, background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.themeToggle:hover {
+  color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+
+@media (max-width: 768px) {
+  .navLinks {
+    display: none; /* In a real app, implement a hamburger menu */
+  }
 }

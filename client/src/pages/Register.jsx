@@ -79,14 +79,14 @@ export default function Register() {
             />
           </div>
           <div className={styles.field}>
-            <label>Wallet Address</label>
+            <label>Wallet Address (Optional)</label>
             <input
               type="text"
               value={formData.walletAddress}
               onChange={(e) =>
                 setFormData({ ...formData, walletAddress: e.target.value })
               }
-              required
+              placeholder="You can connect your wallet after registration"
             />
           </div>
           <div className={styles.field}>

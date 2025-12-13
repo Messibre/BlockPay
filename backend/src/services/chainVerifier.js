@@ -1,4 +1,4 @@
-import { getTransaction, getTransactionUtxos, getExplorerLink } from "./blockfrost.js";
+import { getTransaction, getTransactionUtxos, getExplorerLink } from './blockfrost.js';
 
 /**
  * Verify that a transaction sent funds to a contract address with correct amount
@@ -7,28 +7,26 @@ export const verifyDeposit = async (txHash, contractAddress, expectedAmount) => 
   try {
     const tx = await getTransaction(txHash);
     if (!tx) {
-      return { valid: false, error: "Transaction not found" };
+      return { valid: false, error: 'Transaction not found' };
     }
 
     if (tx.block === null) {
-      return { valid: false, error: "Transaction not confirmed", status: "PENDING" };
+      return { valid: false, error: 'Transaction not confirmed', status: 'PENDING' };
     }
 
     const utxos = await getTransactionUtxos(txHash);
     if (!utxos) {
-      return { valid: false, error: "UTxOs not found" };
+      return { valid: false, error: 'UTxOs not found' };
     }
 
     // Check outputs for contract address
-    const outputToContract = utxos.outputs?.find(
-      (out) => out.address === contractAddress,
-    );
+    const outputToContract = utxos.outputs?.find((out) => out.address === contractAddress);
 
     if (!outputToContract) {
-      return { valid: false, error: "No output to contract address found" };
+      return { valid: false, error: 'No output to contract address found' };
     }
 
-    const amount = outputToContract.amount?.find((a) => a.unit === "lovelace")?.quantity;
+    const amount = outputToContract.amount?.find((a) => a.unit === 'lovelace')?.quantity;
     if (!amount || Number(amount) < expectedAmount) {
       return {
         valid: false,
@@ -51,34 +49,54 @@ export const verifyDeposit = async (txHash, contractAddress, expectedAmount) => 
 /**
  * Verify a payout transaction
  */
-export const verifyPayout = async (txHash, expectedRecipient, expectedAmount) => {
+export const verifyPayout = async (
+  txHash,
+  expectedRecipient,
+  expectedAmount,
+  expectedFeeRecipient = null,
+  expectedFeeAmount = 0,
+) => {
   try {
     const tx = await getTransaction(txHash);
     if (!tx) {
-      return { valid: false, error: "Transaction not found" };
+      return { valid: false, error: 'Transaction not found' };
     }
 
     if (tx.block === null) {
-      return { valid: false, error: "Transaction not confirmed", status: "PENDING" };
+      return { valid: false, error: 'Transaction not confirmed', status: 'PENDING' };
     }
 
     const utxos = await getTransactionUtxos(txHash);
     if (!utxos) {
-      return { valid: false, error: "UTxOs not found" };
+      return { valid: false, error: 'UTxOs not found' };
     }
 
     const outputToRecipient = utxos.outputs?.find((out) => out.address === expectedRecipient);
-
     if (!outputToRecipient) {
-      return { valid: false, error: "No output to recipient found" };
+      return { valid: false, error: 'No output to recipient found' };
     }
 
-    const amount = outputToRecipient.amount?.find((a) => a.unit === "lovelace")?.quantity;
+    const amount = outputToRecipient.amount?.find((a) => a.unit === 'lovelace')?.quantity;
     if (!amount || Number(amount) < expectedAmount) {
       return {
         valid: false,
         error: `Amount mismatch: expected ${expectedAmount}, got ${amount || 0}`,
       };
+    }
+
+    // If a platform fee recipient is expected, verify that output exists and has the expected amount
+    if (expectedFeeRecipient) {
+      const feeOutput = utxos.outputs?.find((out) => out.address === expectedFeeRecipient);
+      if (!feeOutput) {
+        return { valid: false, error: 'No output to platform fee recipient found' };
+      }
+      const feeAmount = feeOutput.amount?.find((a) => a.unit === 'lovelace')?.quantity;
+      if (!feeAmount || Number(feeAmount) < expectedFeeAmount) {
+        return {
+          valid: false,
+          error: `Fee amount mismatch: expected ${expectedFeeAmount}, got ${feeAmount || 0}`,
+        };
+      }
     }
 
     return {
@@ -92,4 +110,3 @@ export const verifyPayout = async (txHash, expectedRecipient, expectedAmount) =>
     return { valid: false, error: error.message };
   }
 };
-

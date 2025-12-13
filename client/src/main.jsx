@@ -1,33 +1,29 @@
+import { MeshProvider } from "@meshsdk/react";
+import { WalletProvider } from "./contexts/WalletContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ToastProvider } from "./contexts/ToastContext";
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MeshProvider } from "@meshsdk/react";
-import { AuthProvider } from "./contexts/AuthContext.jsx";
-import { ToastProvider } from "./contexts/ToastContext.jsx";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import "./index.css";
 
-// Note: vite-plugin-node-polyfills handles Buffer, global, and process automatically
-// No manual polyfills needed!
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <MeshProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
-        </AuthProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <WalletProvider>
+                <App />
+              </WalletProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </ToastProvider>
       </QueryClientProvider>
     </MeshProvider>
   </React.StrictMode>

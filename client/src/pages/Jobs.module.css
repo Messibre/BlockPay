@@ -6,7 +6,7 @@
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
 }
 
 .header {
@@ -20,30 +20,34 @@
 
 .header h1 {
   margin: 0;
-  color: #0066cc;
+  color: var(--text-primary);
+  font-size: 2rem;
 }
 
 .postButton {
-  background-color: #0066cc;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
   color: white;
   padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  font-weight: 500;
+  border-radius: var(--radius-md);
+  font-weight: 600;
   border: none;
   cursor: pointer;
   text-decoration: none;
   display: inline-block;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
 }
 
 .postButton:hover {
-  background-color: #0052a3;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
 }
 
 .filtersSection {
-  background: white;
+  background: var(--bg-secondary);
   padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
   margin-bottom: 2rem;
 }
 
@@ -60,21 +64,23 @@
 
 .clearButton {
   background-color: transparent;
-  color: #666;
+  color: var(--text-secondary);
   padding: 0.75rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 500;
+  transition: all 0.2s;
 }
 
 .clearButton:hover {
-  background-color: #f5f5f5;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .resultsInfo {
   margin-bottom: 1rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .jobList {
@@ -87,10 +93,11 @@
   display: block;
   text-decoration: none;
   color: inherit;
+  transition: transform 0.2s;
 }
 
 .jobCard:hover {
-  text-decoration: none;
+  transform: translateY(-2px);
 }
 
 .jobHeader {
@@ -102,23 +109,24 @@
 }
 
 .jobHeader h3 {
-  color: #0066cc;
+  color: var(--text-primary);
   margin: 0;
   flex: 1;
+  font-size: 1.25rem;
 }
 
 .experience {
-  background-color: #e3f2fd;
-  color: #0066cc;
+  background-color: rgba(99, 102, 241, 0.1);
+  color: var(--accent-primary);
   padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  border-radius: 999px;
   font-size: 0.85rem;
   font-weight: 500;
   text-transform: capitalize;
 }
 
 .description {
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 1rem;
   line-height: 1.6;
 }
@@ -133,12 +141,12 @@
 }
 
 .budget {
-  color: #0066cc;
+  color: var(--accent-primary);
   font-size: 1.1rem;
 }
 
 .deadline {
-  color: #666;
+  color: var(--text-tertiary);
   font-size: 0.9rem;
 }
 
@@ -150,11 +158,11 @@
 }
 
 .tag {
-  background-color: #f0f0f0;
+  background-color: var(--bg-tertiary);
   padding: 0.4rem 0.8rem;
   border-radius: 16px;
   font-size: 0.85rem;
-  color: #333;
+  color: var(--text-secondary);
 }
 
 .footer {
@@ -162,25 +170,27 @@
   justify-content: space-between;
   align-items: center;
   padding-top: 1rem;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-color);
 }
 
 .postedDate {
-  color: #999;
+  color: var(--text-tertiary);
   font-size: 0.85rem;
 }
 
 .viewButton {
   background: none;
   border: none;
-  color: #0066cc;
+  color: var(--accent-primary);
   cursor: pointer;
   font-weight: 500;
   padding: 0;
+  transition: transform 0.2s;
 }
 
 .viewButton:hover {
   text-decoration: underline;
+  transform: translateX(4px);
 }
 
 .loadingContainer {
@@ -190,29 +200,33 @@
 
 .loadingContainer p {
   margin-top: 1rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .error {
   text-align: center;
   padding: 2rem;
-  background: #fee;
-  border-radius: 8px;
-  color: #c33;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-md);
+  color: var(--error);
 }
 
 .empty {
   text-align: center;
   padding: 4rem 2rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
 }
 
 .empty h2 {
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
 .empty p {
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 1.5rem;
 }
 

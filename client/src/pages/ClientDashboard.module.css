@@ -1,12 +1,11 @@
 .dashboard {
-  min-height: calc(100vh - 200px);
   padding: 2rem 0;
 }
 
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
 }
 
 .header {
@@ -19,8 +18,12 @@
 }
 
 .header h1 {
-  color: #0066cc;
-  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .headerActions {
@@ -28,59 +31,30 @@
   gap: 1rem;
 }
 
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 3rem;
-}
-
-.statCard {
-  text-align: center;
-}
-
-.statCard h3 {
-  color: #666;
-  font-size: 0.9rem;
-  font-weight: 500;
-  margin: 0 0 0.5rem 0;
-  text-transform: uppercase;
-}
-
-.statValue {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #0066cc;
-  margin: 0.5rem 0;
-}
-
-.statCard a {
-  color: #0066cc;
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.statCard a:hover {
-  text-decoration: underline;
-}
-
 .notifications {
   margin-bottom: 2rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .notifications h3 {
-  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  color: var(--text-primary);
 }
 
 .notificationList {
   list-style: none;
   padding: 0;
-  margin: 0;
 }
 
 .notificationItem {
-  padding: 1rem;
-  border-bottom: 1px solid #e0e0e0;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -91,62 +65,96 @@
 }
 
 .notificationItem p {
-  margin: 0;
-  flex: 1;
+  color: var(--text-primary);
+  font-size: 0.95rem;
 }
 
 .time {
-  color: #666;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  margin-left: 1rem;
 }
 
-.empty {
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.statCard {
   text-align: center;
-  color: #666;
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
 }
 
-.quickActions {
-  margin-top: 3rem;
+.statCard h3 {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.statValue {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.statCard a {
+  font-size: 0.9rem;
+  color: var(--accent-primary);
+}
+
+.statCard a:hover {
+  text-decoration: underline;
 }
 
 .quickActions h2 {
+  font-size: 1.4rem;
   margin-bottom: 1.5rem;
-  color: #333;
 }
 
 .actionsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1.5rem;
 }
 
 .actionCard {
-  transition: transform 0.2s;
+  height: 100%;
+  transition: all 0.2s;
+  cursor: pointer;
 }
 
 .actionCard:hover {
-  transform: translateY(-2px);
+  border-color: var(--accent-primary);
+  background: rgba(99, 102, 241, 0.05);
 }
 
 .actionCard h3 {
-  margin-top: 0;
-  color: #0066cc;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
 }
 
 .actionCard p {
-  color: #666;
-  margin-bottom: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
-@media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .statsGrid,
-  .actionsGrid {
-    grid-template-columns: 1fr;
-  }
+.empty {
+  color: var(--text-tertiary);
+  font-style: italic;
+  text-align: center;
 }

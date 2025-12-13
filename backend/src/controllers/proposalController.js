@@ -143,8 +143,9 @@ export const acceptProposal = async (req, res, next) => {
       });
     }
 
-    // Generate contract address (placeholder - will be replaced with actual script address)
-    const contractAddress = `addr_test1${Math.random().toString(36).substring(7)}`;
+    // Use configured escrow script address when available, otherwise fallback to placeholder
+    const contractAddress =
+      process.env.ESCROW_SCRIPT_ADDRESS || `addr_test1${Math.random().toString(36).substring(7)}`;
 
     // Get addresses
     const [client, freelancer] = await Promise.all([
@@ -164,6 +165,7 @@ export const acceptProposal = async (req, res, next) => {
       totalAmount: proposal.bidAmount,
       contractNonce: Date.now(),
       feePercent: Number(process.env.PLATFORM_FEE_BPS) || 100,
+      feeAddress: process.env.PLATFORM_FEE_ADDRESS || null,
       status: 'locked',
     };
 

@@ -1,0 +1,19 @@
+{
+  "version": 3,
+  "builds": [
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": { "cwd": "client" }
+    },
+    {
+      "src": "backend/api/**/*.js",
+      "use": "@vercel/node",
+      "config": { "cwd": "backend" }
+    }
+  ],
+  "routes": [
+    { "src": "^/api/(.*)", "dest": "/backend/api/catchall.js" },
+    { "src": "^/(.*)", "dest": "/client/$1" }
+  ]
+}
