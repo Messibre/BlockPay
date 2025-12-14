@@ -1,8 +1,9 @@
 import {
-  Transaction,
+  MeshTxBuilder,
   resolvePaymentKeyHash,
   resolvePlutusScriptAddress,
   resolveDataHash,
+  BlockfrostProvider,
 } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 
@@ -16,7 +17,80 @@ export const adaToLovelace = (ada) => {
   return Math.floor(ada * 1000000);
 };
 
-// Helper: datum is complex, we need to format it for Mesh
+// Helper functions for proper redeemer data serialization
+export const createRedeemerData = {
+  // Aiken: Deposit -> Constr 0 []
+  deposit: () => {
+    return {
+      alternative: 0,
+      fields: []
+    };
+  },
+  
+  // Aiken: Release(ByteArray) -> Constr 1 [ByteArray milestoneId]
+  release: (milestoneId) => {
+    const milestoneIdStr = typeof milestoneId !== "string" ? String(milestoneId) : milestoneId;
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(milestoneIdStr);
+    
+    return {
+      alternative: 1,
+      fields: [
+        {
+          alternative: 0,
+          fields: [Array.from(bytes)]
+        }
+      ]
+    };
+  },
+  
+  // Aiken: Withdraw(ByteArray) -> Constr 2 [ByteArray milestoneId]
+  withdraw: (milestoneId) => {
+    const milestoneIdStr = typeof milestoneId !== "string" ? String(milestoneId) : milestoneId;
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(milestoneIdStr);
+    
+    return {
+      alternative: 2,
+      fields: [
+        {
+          alternative: 0,
+          fields: [Array.from(bytes)]
+        }
+      ]
+    };
+  },
+  
+  // Aiken: Refund -> Constr 3 []
+  refund: () => {
+    return {
+      alternative: 3,
+      fields: []
+    };
+  },
+  
+  // Aiken: Arbitrate(ArbitrateDecision) -> Constr 4 [ArbitrateDecision]
+  arbitrate: (decision) => {
+    const decisionMap = {
+      'PayFull': 0,
+      'PayPartial': 1,
+      'RefundFull': 2,
+      'RefundPartial': 3
+    };
+    const decisionIndex = typeof decision === 'string' ? decisionMap[decision] : decision;
+    
+    return {
+      alternative: 4,
+      fields: [
+        {
+          alternative: decisionIndex,
+          fields: []
+        }
+      ]
+    };
+  }
+};
+
 // assuming datum structure matches what the validator expects
 const toMeshDatum = (d) => {
   // Basic validators / sanitizers
@@ -82,21 +156,45 @@ export const buildDepositTransaction = async (
   amount,
   datum
 ) => {
-  const tx = new Transaction({ initiator: wallet });
+  // Initialize MeshTxBuilder
+  const blockfrostProvider = new BlockfrostProvider(import.meta.env.VITE_BLOCKFROST_KEY);
+  const txBuilder = new MeshTxBuilder({
+    fetcher: blockfrostProvider,
+    evaluator: blockfrostProvider,
+    verbose: false,
+  });
+
+  // Manually fetch and provide UTXOs to the builder
+  const walletUtxos = await wallet.getUtxos();
+  const cleanUtxos = JSON.parse(JSON.stringify(walletUtxos));
+  txBuilder.selectUtxosFrom(cleanUtxos);
+
+  // Set Collateral (Required for Plutus V3 transactions)
+  const collateralUtxos = await wallet.getCollateral();
+  if (collateralUtxos && collateralUtxos.length > 0) {
+    const collateral = collateralUtxos[0];
+    txBuilder.txInCollateral(
+      collateral.input.txHash,
+      collateral.input.outputIndex,
+      collateral.output.amount,
+      collateral.output.address
+    );
+  }
+
+  // Add wallet as required signer
+  const changeAddress = await wallet.getChangeAddress();
+  txBuilder.requiredSignerHash(resolvePaymentKeyHash(changeAddress));
+
   const meshDatum = toMeshDatum(datum);
 
-  tx.sendLovelace(
-    {
-      address: contractAddress,
-      datum: {
-        value: meshDatum,
-        inline: true,
-      },
-    },
-    amount.toString()
-  );
+  // Output: Contract deposit with inline datum
+  txBuilder.txOut(contractAddress, [{ unit: "lovelace", quantity: amount.toString() }]);
+  txBuilder.txOutInlineDatumValue(meshDatum);
 
-  const unsignedTx = await tx.build();
+  // Set change address
+  txBuilder.changeAddress(changeAddress);
+
+  const unsignedTx = await txBuilder.complete();
   const signedTx = await wallet.signTx(unsignedTx);
   const txHash = await wallet.submitTx(signedTx);
 
@@ -116,26 +214,32 @@ export const buildReleaseTransaction = async (
   feeAddress = null,
   feeAmount = 0
 ) => {
-  const tx = new Transaction({ initiator: wallet });
+  // Initialize MeshTxBuilder
+  const blockfrostProvider = new BlockfrostProvider(import.meta.env.VITE_BLOCKFROST_KEY);
+  const txBuilder = new MeshTxBuilder({
+    fetcher: blockfrostProvider,
+    evaluator: blockfrostProvider,
+    verbose: false,
+  });
 
-  // Format UTxO for Mesh SDK
-  // Backend returns: {txHash, outputIndex, amount, datum}
-  // Mesh expects: {input: {txHash, outputIndex}, output: {address, amount, datum?}}
-  const meshUtxo = {
-    input: {
-      txHash: utxo.txHash,
-      outputIndex: utxo.outputIndex,
-    },
-    output: {
-      address: scriptAddress,
-      amount: utxo.amount,
-      dataHash: typeof utxo.datum === 'string' && utxo.datum.length === 64 ? utxo.datum : undefined,
-      plutusData: typeof utxo.datum === 'string' && utxo.datum.length > 64 ? utxo.datum : undefined,
-    },
-  };
+  // Manually fetch and provide UTXOs to the builder
+  const walletUtxos = await wallet.getUtxos();
+  const cleanUtxos = JSON.parse(JSON.stringify(walletUtxos));
+  txBuilder.selectUtxosFrom(cleanUtxos);
 
-  // Add client as required signer (validator checks extra_signatories)
-  // Validate client address before resolving
+  // Set Collateral (Required for Plutus V3 transactions)
+  const collateralUtxos = await wallet.getCollateral();
+  if (collateralUtxos && collateralUtxos.length > 0) {
+    const collateral = collateralUtxos[0];
+    txBuilder.txInCollateral(
+      collateral.input.txHash,
+      collateral.input.outputIndex,
+      collateral.output.amount,
+      collateral.output.address
+    );
+  }
+
+  // Add client as required signer
   const isBech32 = (s) =>
     typeof s === "string" &&
     /^(addr1|addr_test1)[0-9a-z]+$/.test(s) &&
@@ -143,70 +247,50 @@ export const buildReleaseTransaction = async (
   
   if (!isBech32(oldDatum.client)) {
     throw new Error(
-      `Invalid client address in datum: "${oldDatum.client}". Expected a valid Bech32 address (addr1... or addr_test1...)`
+      `Invalid client address in datum: "${oldDatum.client}". Expected a valid Bech32 address`
     );
   }
+  txBuilder.requiredSignerHash(resolvePaymentKeyHash(oldDatum.client));
+
+  // ✅ FIXED: Use proper redeemer data structure
+  const redeemerData = createRedeemerData.release(milestoneId);
+
+  // Setup spending transaction with proper script reference
+  txBuilder.spendingPlutusScriptV3();
+  txBuilder.txIn(utxo.txHash, utxo.outputIndex);
   
-  // Add client as required signer (validator checks extra_signatories)
-  // setRequiredSigners expects Bech32 addresses, not pub key hashes
-  tx.setRequiredSigners([oldDatum.client]);
+  // Use the script from constants with proper structure
+  const script = { code: contractScript.cbor, version: "V3" };
+  txBuilder.txInScript(script);
+  txBuilder.txInRedeemerValue(redeemerData); // ✅ NOW WORKS - proper data structure
+  txBuilder.txInInlineDatumPresent();
 
-  // Script Input
-  // Note: When UTxO has inline datum (plutusData in output), we don't need to provide datum separately
-  tx.redeemValue({
-    value: meshUtxo,
-    script: {
-      version: "V2", // Aiken compiles to PlutusV2 by default
-      code: contractScript.cbor,
-    },
-    redeemer: {
-      data: {
-        alternative: 1, // Release
-        fields: [
-          // Sanitize milestoneId to hex ByteArray (same as in datum)
-          typeof milestoneId !== "string" ? String(milestoneId) : milestoneId,
-        ].map((id) => {
-          const encoder = new TextEncoder();
-          const bytes = encoder.encode(id);
-          const hex = Array.from(bytes)
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("");
-          return hex.length < 8
-            ? (hex + Math.floor(Date.now() % 0xffffffff).toString(16).padStart(8, "0")).substring(0, 8)
-            : hex;
-        }),
-      },
-    },
-  });
+  // Output 1: Freelancer payment
+  txBuilder.txOut(freelancerAddress, [{ unit: "lovelace", quantity: payoutAmount.toString() }]);
 
-  // Output 1: Freelancer
-  tx.sendLovelace(freelancerAddress, payoutAmount.toString());
-
-  // Output Fee: Platform Fee (if configured)
+  // Output 2: Platform fee (if applicable)
   if (feeAddress && feeAmount > 0) {
-    tx.sendLovelace(feeAddress, feeAmount.toString());
+    txBuilder.txOut(feeAddress, [{ unit: "lovelace", quantity: feeAmount.toString() }]);
   }
 
-  // Output 2: Script (Remaining funds + updated datum)
+  // Output 3: Remaining funds back to script
   if (remainingAmount > 0) {
-    tx.sendLovelace(
-      {
-        address: scriptAddress,
-        datum: {
-          value: toMeshDatum(newDatum),
-          inline: true,
-        },
-      },
-      remainingAmount.toString()
-    );
+    const updatedScript = { code: contractScript.cbor, version: "V3" };
+    const actualScriptAddress = resolvePlutusScriptAddress(updatedScript, 0);
+    txBuilder.txOut(actualScriptAddress, [{ unit: "lovelace", quantity: remainingAmount.toString() }]);
+    txBuilder.txOutInlineDatumValue(toMeshDatum(newDatum));
   }
 
-  const unsignedTx = await tx.build();
+  const changeAddress = await wallet.getChangeAddress();
+  txBuilder.changeAddress(changeAddress);
+
+  const unsignedTx = await txBuilder.complete();
   const signedTx = await wallet.signTx(unsignedTx);
   const txHash = await wallet.submitTx(signedTx);
 
   return txHash;
 };
+
 // Helper: Find UTxO matching the contract datum
 export const findMatchingUtxo = (utxos, contractDatum) => {
   if (!utxos || utxos.length === 0) return null;

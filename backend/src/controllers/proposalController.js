@@ -2,6 +2,7 @@ import Proposal from '../models/Proposal.js';
 import Job from '../models/Job.js';
 import Contract from '../models/Contract.js';
 import User from '../models/User.js';
+import { createNotification } from './notificationController.js';
 
 export const submitProposal = async (req, res, next) => {
   try {
@@ -77,6 +78,15 @@ export const submitProposal = async (req, res, next) => {
     });
 
     await proposal.save();
+
+    // Notify client
+    await createNotification({
+      recipientId: job.clientId,
+      type: 'proposal_received',
+      title: 'New Proposal Received',
+      message: `A new proposal has been submitted for your job "${job.title}"`,
+      relatedId: proposal._id,
+    });
 
     res.status(201).json({
       proposalId: proposal._id,
@@ -167,6 +177,12 @@ export const acceptProposal = async (req, res, next) => {
       });
     }
 
+    // Pre-process milestones to ensure they have stable IDs
+    const processedMilestones = milestones.map(m => ({
+      ...m,
+      id: m.id || `milestone_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+    }));
+
     // Use configured escrow script address when available, otherwise fallback to placeholder
     const contractAddress =
       process.env.ESCROW_SCRIPT_ADDRESS || `addr_test1${Math.random().toString(36).substring(7)}`;
@@ -182,8 +198,8 @@ export const acceptProposal = async (req, res, next) => {
       // Prefer freelancer's selected payment address from proposal, fallback to stored walletAddress
       freelancer: proposal.preferredPaymentAddress || freelancer?.walletAddress || 'addr_test1...',
       amount: proposal.bidAmount,
-      milestones: milestones.map((m) => ({
-        id: m.id || `milestone_${Date.now()}_${Math.random()}`,
+      milestones: processedMilestones.map((m) => ({
+        id: m.id,
         amount: m.amount,
         paid: false,
       })),
@@ -202,8 +218,8 @@ export const acceptProposal = async (req, res, next) => {
       contractAddress,
       datum: contractDatum,
       totalAmount: proposal.bidAmount,
-      milestones: milestones.map((m) => ({
-        id: m.id || `milestone_${Date.now()}_${Math.random()}`,
+      milestones: processedMilestones.map((m) => ({
+        id: m.id,
         title: m.title,
         description: m.description || '',
         amount: m.amount,
@@ -235,6 +251,15 @@ export const acceptProposal = async (req, res, next) => {
         contractAddress,
       },
       message: 'Proposal accepted and contract created',
+    });
+
+    // Notify freelancer
+    await createNotification({
+      recipientId: proposal.freelancerId,
+      type: 'contract_update',
+      title: 'Proposal Accepted',
+      message: `Your proposal for "${proposal.jobId.title}" has been accepted!`,
+      relatedId: contract._id,
     });
   } catch (error) {
     next(error);

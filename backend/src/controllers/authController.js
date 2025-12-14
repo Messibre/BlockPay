@@ -2,205 +2,220 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import messageSigning from '@emurgo/cardano-message-signing-nodejs';
+import { validateRequest, sanitize, schemas } from '../middleware/validation.js';
 const { verifyMessage } = messageSigning;
 
 const generateToken = (userId, role) => {
-  return jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  // Shorter token expiration for better security
+  return jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
-export const register = async (req, res, next) => {
-  try {
-    const { email, password, displayName, role, walletAddress } = req.body;
-
-    if (!displayName || !role) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    if (email && password) {
-      const existing = await User.findOne({ email });
-      if (existing) {
-        return res.status(409).json({ message: 'Email already registered' });
-      }
-    }
-
-    // Only check for existing wallet if walletAddress is provided
-    const isValidAddress = (a) => typeof a === 'string' && /^(addr1|addr_test1)[0-9a-z]+$/.test(a);
-    if (walletAddress) {
-      if (!isValidAddress(walletAddress)) {
-        return res.status(400).json({ message: 'Invalid wallet address format' });
-      }
-      const existingWallet = await User.findOne({ walletAddress });
-      if (existingWallet) {
-        return res.status(409).json({ message: 'Wallet already registered' });
-      }
-    }
-
-    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
-
-    const userData = {
-      fullName: displayName,
-      email: email || null,
-      passwordHash,
-      role,
-      walletAddress: walletAddress || null,
-    };
-
-    // Only add wallets array if walletAddress is provided
-    if (walletAddress) {
-      userData.wallets = [{ address: walletAddress, isPrimary: true }];
-    }
-
-    const user = new User(userData);
-
-    await user.save();
-
-    const token = generateToken(user._id, user.role);
-
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.fullName,
-        email: user.email,
-        role: user.role,
-        walletAddress: user.walletAddress,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+const generateRefreshToken = (userId, role) => {
+  return jwt.sign({ userId, role, type: 'refresh' }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
-export const login = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password required' });
-    }
-
-    const user = await User.findOne({ email });
-    if (!user || !user.passwordHash) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const token = generateToken(user._id, user.role);
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.fullName,
-        email: user.email,
-        role: user.role,
-        walletAddress: user.walletAddress,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const verifyWallet = async (req, res, next) => {
-  try {
-    const { address, signature, message } = req.body;
-
-    if (!address || !signature || !message) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    const isValidAddress = (a) => typeof a === 'string' && /^(addr1|addr_test1)[0-9a-z]+$/.test(a);
-    if (!isValidAddress(address)) {
-      return res.status(400).json({ message: 'Invalid wallet address format' });
-    }
-    // Verify signature using emurgo library (CIP-30 signatures)
-    let valid = false;
+export const register = [
+  validateRequest(schemas.register),
+  async (req, res, next) => {
     try {
-      valid = verifyMessage(signature, address, message);
-    } catch (e) {
-      // Keep valid=false
-      console.warn('Signature verification error', e.message || e);
-    }
+      const { email, password, displayName, role, walletAddress } = req.body;
 
-    if (!valid) {
-      return res.status(400).json({ message: 'Signature verification failed' });
-    }
-
-    // If an Authorization token is present, link wallet to that user
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.split(' ')[1];
-        const payload = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(payload.userId);
-        if (!user) return res.status(404).json({ message: 'User not found' });
-
-        // Prevent duplicate
-        if (!user.wallets?.some((w) => w.address === address)) {
-          user.wallets = user.wallets || [];
-          user.wallets.push({ address, isPrimary: user.wallets.length === 0 });
-        }
-        // Set walletAddress if missing
-        if (!user.walletAddress) user.walletAddress = address;
-
-        await user.save();
-
-        const newToken = generateToken(user._id, user.role);
-        return res.json({
-          token: newToken,
-          user: {
-            id: user._id,
-            name: user.fullName,
-            email: user.email,
-            role: user.role,
-            walletAddress: user.walletAddress,
-            wallets: user.wallets,
-          },
-        });
-      } catch (e) {
-        console.warn('Auth token invalid for wallet link', e.message || e);
-        // fall through to create/find user behavior
+      // Additional validation after sanitization
+      if (!displayName || !role) {
+        return res.status(400).json({ message: 'Missing required fields' });
       }
-    }
 
-    // No auth token, behave as login/signup via wallet
-    let user = await User.findOne({ wallets: { $elemMatch: { address } } });
+      // Sanitize inputs
+      const sanitizedEmail = email ? sanitize.email(email) : null;
+      const sanitizedWalletAddress = walletAddress ? sanitize.walletAddress(walletAddress) : null;
 
-    if (!user) {
-      // Create wallet-only user
-      user = new User({
-        fullName: `Wallet ${address.slice(0, 8)}...`,
-        email: null,
-        passwordHash: null,
-        role: 'client', // Default, can be updated later
-        walletAddress: address,
-        wallets: [{ address, isPrimary: true }],
-      });
+      if (email && password) {
+        const existing = await User.findOne({ email: sanitizedEmail });
+        if (existing) {
+          return res.status(409).json({ message: 'Email already registered' });
+        }
+      }
+
+      if (sanitizedWalletAddress) {
+        const existingWallet = await User.findOne({ walletAddress: sanitizedWalletAddress });
+        if (existingWallet) {
+          return res.status(409).json({ message: 'Wallet already registered' });
+        }
+      }
+
+      const passwordHash = password ? await bcrypt.hash(password, 12) : null; // Increased rounds
+
+      const userData = {
+        fullName: sanitize.html(displayName),
+        email: sanitizedEmail,
+        passwordHash,
+        role,
+        walletAddress: sanitizedWalletAddress,
+      };
+
+      if (sanitizedWalletAddress) {
+        userData.wallets = [{ address: sanitizedWalletAddress, isPrimary: true }];
+      }
+
+      const user = new User(userData);
       await user.save();
+
+      const token = generateToken(user._id, user.role);
+      const refreshToken = generateRefreshToken(user._id, user.role);
+
+      res.status(201).json({
+        token,
+        refreshToken,
+        user: {
+          id: user._id,
+          name: user.fullName,
+          email: user.email,
+          role: user.role,
+          walletAddress: user.walletAddress,
+        },
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const token = generateToken(user._id, user.role);
-
-    res.json({
-      token,
-      user: {
-        id: user._id,
-        name: user.fullName,
-        email: user.email,
-        role: user.role,
-        walletAddress: user.walletAddress,
-        wallets: user.wallets,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
-};
+];
+
+export const login = [
+  validateRequest(schemas.login),
+  async (req, res, next) => {
+    try {
+      const { email, password } = req.body;
+
+      // Sanitize email
+      const sanitizedEmail = sanitize.email(email);
+
+      const user = await User.findOne({ email: sanitizedEmail });
+      if (!user || !user.passwordHash) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const token = generateToken(user._id, user.role);
+      const refreshToken = generateRefreshToken(user._id, user.role);
+
+      res.json({
+        token,
+        refreshToken,
+        user: {
+          id: user._id,
+          name: user.fullName,
+          email: user.email,
+          role: user.role,
+          walletAddress: user.walletAddress,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+];
+
+export const verifyWallet = [
+  validateRequest(schemas.verifyWallet),
+  async (req, res, next) => {
+    try {
+      const { address, signature, message } = req.body;
+
+      // Sanitize inputs
+      const sanitizedAddress = sanitize.walletAddress(address);
+      const sanitizedMessage = sanitize.html(message);
+
+      // Verify signature using emurgo library (CIP-30 signatures)
+      let valid = false;
+      try {
+        valid = verifyMessage(signature, sanitizedAddress, sanitizedMessage);
+      } catch (e) {
+        console.warn('Signature verification error', e.message || e);
+      }
+
+      if (!valid) {
+        return res.status(400).json({ message: 'Signature verification failed' });
+      }
+
+      // If an Authorization token is present, link wallet to that user
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const payload = jwt.verify(token, process.env.JWT_SECRET);
+          const user = await User.findById(payload.userId);
+          if (!user) return res.status(404).json({ message: 'User not found' });
+
+          // Prevent duplicate
+          if (!user.wallets?.some((w) => w.address === sanitizedAddress)) {
+            user.wallets = user.wallets || [];
+            user.wallets.push({ address: sanitizedAddress, isPrimary: user.wallets.length === 0 });
+          }
+          // Set walletAddress if missing
+          if (!user.walletAddress) user.walletAddress = sanitizedAddress;
+
+          await user.save();
+
+          const newToken = generateToken(user._id, user.role);
+          const newRefreshToken = generateRefreshToken(user._id, user.role);
+
+          return res.json({
+            token: newToken,
+            refreshToken: newRefreshToken,
+            user: {
+              id: user._id,
+              name: user.fullName,
+              email: user.email,
+              role: user.role,
+              walletAddress: user.walletAddress,
+              wallets: user.wallets,
+            },
+          });
+        } catch (e) {
+          console.warn('Auth token invalid for wallet link', e.message || e);
+        }
+      }
+
+      // No auth token, behave as login/signup via wallet
+      let user = await User.findOne({ wallets: { $elemMatch: { address: sanitizedAddress } } });
+
+      if (!user) {
+        // Create wallet-only user
+        user = new User({
+          fullName: `Wallet ${sanitizedAddress.slice(0, 8)}...`,
+          email: null,
+          passwordHash: null,
+          role: 'client',
+          walletAddress: sanitizedAddress,
+          wallets: [{ address: sanitizedAddress, isPrimary: true }],
+        });
+        await user.save();
+      }
+
+      const token = generateToken(user._id, user.role);
+      const refreshToken = generateRefreshToken(user._id, user.role);
+
+      res.json({
+        token,
+        refreshToken,
+        user: {
+          id: user._id,
+          name: user.fullName,
+          email: user.email,
+          role: user.role,
+          walletAddress: user.walletAddress,
+          wallets: user.wallets,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+];
 
 export const getMe = async (req, res, next) => {
   try {
@@ -214,28 +229,40 @@ export const getMe = async (req, res, next) => {
   }
 };
 
-export const updateMe = async (req, res, next) => {
-  try {
-    const { displayName, email } = req.body;
-    const updates = {};
+export const updateMe = [
+  validateRequest({
+    body: {
+      displayName: { type: 'string', minLength: 2, maxLength: 100 },
+      email: { type: 'string', pattern: 'email', maxLength: 255 }
+    }
+  }),
+  async (req, res, next) => {
+    try {
+      const { displayName, email } = req.body;
+      const updates = {};
 
-    if (displayName) updates.fullName = displayName;
-    if (email) updates.email = email;
+      if (displayName) updates.fullName = sanitize.html(displayName);
+      if (email) updates.email = sanitize.email(email);
 
-    const user = await User.findByIdAndUpdate(req.userId, updates, {
-      new: true,
-      runValidators: true,
-    }).select('-passwordHash');
+      const user = await User.findByIdAndUpdate(req.userId, updates, {
+        new: true,
+        runValidators: true,
+      }).select('-passwordHash');
 
-    res.json(user);
-  } catch (error) {
-    next(error);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json(user);
+    } catch (error) {
+      next(error);
+    }
   }
-};
+];
 
 export const getUsers = async (req, res, next) => {
   try {
-    const { role, search } = req.query;
+    const { role, search, limit = 50, page = 1 } = req.query;
     const query = {};
 
     if (role) {
@@ -243,14 +270,35 @@ export const getUsers = async (req, res, next) => {
     }
 
     if (search) {
+      const sanitizedSearch = sanitize.html(search);
       query.$or = [
-        { fullName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
+        { fullName: { $regex: sanitizedSearch, $options: 'i' } },
+        { email: { $regex: sanitizedSearch, $options: 'i' } },
       ];
     }
 
-    const users = await User.find(query).select('-passwordHash -wallets');
-    res.json(users);
+    // Add pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+
+    const users = await User.find(query)
+      .select('-passwordHash -wallets')
+      .limit(limitNum)
+      .skip(skip)
+      .sort({ createdAt: -1 });
+
+    const total = await User.countDocuments(query);
+
+    res.json({
+      users,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (error) {
     next(error);
   }

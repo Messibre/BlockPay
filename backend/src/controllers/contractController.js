@@ -2,6 +2,7 @@ import Contract from '../models/Contract.js';
 import { verifyDeposit, verifyPayout } from '../services/chainVerifier.js';
 import Payment from '../models/Payment.js';
 import User from '../models/User.js';
+import { createNotification } from './notificationController.js';
 
 // Get configured contract address (use env var for deployed script), otherwise keep fallback
 const generateContractAddress = () => {
@@ -256,6 +257,15 @@ export const recordDeposit = async (req, res, next) => {
     contract.offchainState = 'FUNDED';
     await contract.save();
 
+    // Notify client of successful deposit
+    await createNotification({
+      recipientId: contract.clientId,
+      type: 'system',
+      title: 'Deposit Confirmed',
+      message: `Your deposit of ${payment.amountADA} ADA for contract ${contract._id} has been confirmed.`,
+      relatedId: contract._id,
+    });
+
     res.json({
       status: payment.status,
       txHash,
@@ -288,6 +298,7 @@ export const approveMilestone = async (req, res, next) => {
     const contract = await Contract.findById(contractId).populate('freelancerId', 'walletAddress');
 
     if (!contract) {
+      console.warn(`Contract not found: ${contractId}`);
       return res.status(404).json({ message: 'Contract not found' });
     }
 
@@ -297,9 +308,28 @@ export const approveMilestone = async (req, res, next) => {
     }
 
     // Find milestone
+    // Mongoose might conflict 'id' field with virtual getter.
+    // We check both the field 'id' and '_id' just in case, but usually we want the custom 'id' field.
     const milestone = contract.milestones.find((m) => m.id === milestoneId);
+    
     if (!milestone) {
-      return res.status(404).json({ message: 'Milestone not found' });
+      const available = contract.milestones.map(m => ({ 
+        id_field: m.get('id'), // Explicitly get the field
+        virtual_id: m.id,      // The property access
+        _id: m._id 
+      }));
+      
+      console.warn(`Milestone not found. ContractId: ${contractId}, Requested: ${milestoneId}`);
+      console.warn('Available:', JSON.stringify(available));
+
+      return res.status(404).json({ 
+        message: 'Milestone not found', 
+        debug: {
+          requestedId: milestoneId,
+          contractId,
+          availableIds: available
+        }
+      });
     }
 
     if (milestone.status !== 'submitted') {
@@ -369,6 +399,15 @@ export const approveMilestone = async (req, res, next) => {
       });
 
       await payment.save();
+
+      // Notify freelancer of payment release
+      await createNotification({
+        recipientId: contract.freelancerId,
+        type: 'payment_received',
+        title: 'Payment Released',
+        message: `Payment of ${payoutAmount} ADA for milestone "${milestone.title}" has been released.`,
+        relatedId: contract._id,
+      });
     }
 
     // Update milestone status

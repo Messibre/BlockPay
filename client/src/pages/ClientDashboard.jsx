@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ProtectedRoute from "../components/ProtectedRoute.jsx";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
@@ -35,8 +35,27 @@ function ClientDashboardContent() {
     // Continue with initialData or show alert - for now just log
   }
 
-  // No notifications by default
-  const notifications = [];
+  // Fetch notifications
+  const { data: notificationsData, refetch: refetchNotifications } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => api.getNotifications(),
+    refetchInterval: 15000, // Poll every 15s
+  });
+
+  const notifications = notificationsData?.notifications || [];
+  const unreadCount = notificationsData?.unreadCount || 0;
+
+  const markReadMutation = useMutation({
+    mutationFn: api.markNotificationRead,
+    onSuccess: () => {
+      refetchNotifications();
+    },
+  });
+
+  const handleMarkRead = (id) => {
+    markReadMutation.mutate(id);
+  };
+
 
   return (
     <div className={styles.dashboard}>
@@ -45,7 +64,7 @@ function ClientDashboardContent() {
           <h1>Welcome back, {user?.displayName || user?.email}!</h1>
           <div className={styles.headerActions}>
             <Button onClick={() => setNotificationsOpen(!notificationsOpen)}>
-              Notifications ({notifications.length})
+              Notifications ({unreadCount})
             </Button>
             <Link to="/jobs/post">
               <Button>Post New Job</Button>
@@ -61,9 +80,22 @@ function ClientDashboardContent() {
             ) : (
               <ul className={styles.notificationList}>
                 {notifications.map((notif) => (
-                  <li key={notif.id} className={styles.notificationItem}>
-                    <p>{notif.message}</p>
-                    <span className={styles.time}>{notif.time}</span>
+                  <li key={notif._id} className={`${styles.notificationItem} ${!notif.isRead ? styles.unread : ''}`}>
+                    <div style={{ flex: 1 }}>
+                        <p><strong>{notif.title}</strong></p>
+                        <p>{notif.message}</p>
+                        <span className={styles.time}>{new Date(notif.createdAt).toLocaleString()}</span>
+                    </div>
+                    {!notif.isRead && (
+                        <Button 
+                            variant="text" 
+                            size="small" 
+                            onClick={() => handleMarkRead(notif._id)}
+                            style={{ marginLeft: '10px', fontSize: '0.8rem' }}
+                        >
+                            Mark Read
+                        </Button>
+                    )}
                   </li>
                 ))}
               </ul>

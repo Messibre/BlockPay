@@ -1,4 +1,6 @@
 import Job from "../models/Job.js";
+import User from "../models/User.js";
+import { createNotification } from "./notificationController.js";
 
 export const createJob = async (req, res, next) => {
   try {
@@ -20,6 +22,27 @@ export const createJob = async (req, res, next) => {
     });
 
     await job.save();
+
+    // Notify freelancers with matching tags
+    // Finding freelancers who have ANY of the job tags in their skills
+    // Note: This assumes User model has a simple array of strings for skills or similar.
+    // If skills is an array of objects, we need to adjust.
+    if (tags && tags.length > 0) {
+      const freelancers = await User.find({
+        role: 'freelancer',
+        'skills': { $in: tags } 
+      }).select('_id');
+
+      for (const freelancer of freelancers) {
+        createNotification({
+          recipientId: freelancer._id,
+          type: 'job_match',
+          title: 'New Job Match',
+          message: `A new job "${title}" matches your skills: ${tags.join(', ')}`,
+          relatedId: job._id,
+        });
+      }
+    }
 
     res.status(201).json({
       jobId: job._id,

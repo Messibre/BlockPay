@@ -1,7 +1,3 @@
-.walletPicker {
-  /* This component likely uses the modal styles from Layout or its own similar styles */
-  /* We'll define standard modal contents here if needed */
-}
 
 .overlay {
   position: fixed;

@@ -316,10 +316,13 @@ export default function ContractDetail() {
         throw new Error("Milestone not found");
       }
 
-      // 1. Fetch Contract UTxOs
-      const utxosResponse = await api.getScriptUtxos(scriptAddress);
-      const utxos = utxosResponse.utxos;
+      const scriptAddress = contract.contractAddress;
+      const response = await api.getScriptUtxos(scriptAddress);
+      const utxos = response.utxos || [];
 
+      if (!utxos || utxos.length === 0) {
+        throw new Error("No UTxOs found in contract script");
+      }
       // Basic address validator
       const isBech32 = (s) =>
         typeof s === "string" &&
@@ -639,7 +642,7 @@ export default function ContractDetail() {
                     <div className={styles.depositRow}>
                       <span className={styles.label}>Amount:</span>
                       <span className={styles.value}>
-                        {lovelaceToAda(deposit.amountADA)} ADA
+                        {deposit.amountADA} ADA
                       </span>
                     </div>
                     <div className={styles.depositRow}>

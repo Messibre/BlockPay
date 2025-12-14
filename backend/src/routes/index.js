@@ -4,6 +4,7 @@ import jobRoutes from './jobs.js';
 import contractRoutes from './contracts.js';
 import proposalRoutes from './proposals.js';
 import utilRoutes from './utils.js';
+import notificationRoutes from './notifications.js';
 import { authenticate } from '../middleware/auth.js';
 import { getDashboardStats } from '../controllers/dashboardController.js';
 
@@ -13,7 +14,8 @@ router.use('/auth', authRoutes);
 router.use('/jobs', jobRoutes);
 router.use('/contracts', contractRoutes);
 router.use('/proposals', proposalRoutes);
-router.use('/', utilRoutes);
+router.use('/utils', utilRoutes);
+router.use('/notifications', notificationRoutes);
 
 // Dashboard Routes
 router.get('/dashboard/stats', authenticate, getDashboardStats);

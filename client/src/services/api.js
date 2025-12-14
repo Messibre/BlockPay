@@ -106,10 +106,16 @@ export default {
     api.post(`/contracts/${contractId}/refund`, data).then((res) => res.data),
 
   // Utils
-  getTxStatus: (txHash) => api.get(`/tx/${txHash}`).then((res) => res.data),
+  getTxStatus: (txHash) => api.get(`/utils/tx/${txHash}`).then((res) => res.data),
   getScriptUtxos: (address) =>
-    api.get(`/script/${address}/utxos`).then((res) => res.data),
+    api.get(`/utils/script/${address}/utxos`).then((res) => res.data),
 
   // Dashboard
   getDashboardStats: () => api.get("/dashboard/stats").then((res) => res.data),
+
+  // Notifications
+  getNotifications: (filters = {}) =>
+    api.get("/notifications", { params: filters }).then((res) => res.data),
+  markNotificationRead: (id) =>
+    api.put(`/notifications/${id}/read`).then((res) => res.data),
 };
