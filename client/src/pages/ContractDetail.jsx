@@ -370,6 +370,14 @@ export default function ContractDetail() {
         arbitrator: arbitratorAddr || clientAddr, // Fallback
       };
 
+      // Validate critical addresses
+      if (!isBech32(currentDatum.client)) {
+        throw new Error(`Invalid client address: ${currentDatum.client}`);
+      }
+      if (!isBech32(currentDatum.freelancer)) {
+        throw new Error(`Invalid freelancer address: ${currentDatum.freelancer}`);
+      }
+
       // 4. Find relevant UTxO
       const utxo = findMatchingUtxo(utxos, currentDatum);
       if (!utxo) {

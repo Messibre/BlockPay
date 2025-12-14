@@ -118,24 +118,63 @@ export const buildReleaseTransaction = async (
 ) => {
   const tx = new Transaction({ initiator: wallet });
 
-  // Script Input
-  tx.redeemValue({
-    value: utxo,
-    script: {
-      version: "V3",
-      code: contractScript.cbor,
+  // Format UTxO for Mesh SDK
+  // Backend returns: {txHash, outputIndex, amount, datum}
+  // Mesh expects: {input: {txHash, outputIndex}, output: {address, amount, datum?}}
+  const meshUtxo = {
+    input: {
+      txHash: utxo.txHash,
+      outputIndex: utxo.outputIndex,
     },
-    datum: {
-      value: toMeshDatum(oldDatum), // Provide datum for validation
-      inline: true, // We assume it was inline, but for redeeming we might need to exact match? If inline, we don't need to provide it?
-      // Mesh: If UTxO has inline datum, we don't MUST provide it, but `datum` field in `redeemValue` maps to the Datum *we are spending* or used for building context?
-      // Actually for V2/V3 we just need Ref Input or Inline Datum on UTxO.
-      // If inline, good.
+    output: {
+      address: scriptAddress,
+      amount: utxo.amount,
+      dataHash: typeof utxo.datum === 'string' && utxo.datum.length === 64 ? utxo.datum : undefined,
+      plutusData: typeof utxo.datum === 'string' && utxo.datum.length > 64 ? utxo.datum : undefined,
+    },
+  };
+
+  // Add client as required signer (validator checks extra_signatories)
+  // Validate client address before resolving
+  const isBech32 = (s) =>
+    typeof s === "string" &&
+    /^(addr1|addr_test1)[0-9a-z]+$/.test(s) &&
+    s.length >= 8;
+  
+  if (!isBech32(oldDatum.client)) {
+    throw new Error(
+      `Invalid client address in datum: "${oldDatum.client}". Expected a valid Bech32 address (addr1... or addr_test1...)`
+    );
+  }
+  
+  // Add client as required signer (validator checks extra_signatories)
+  // setRequiredSigners expects Bech32 addresses, not pub key hashes
+  tx.setRequiredSigners([oldDatum.client]);
+
+  // Script Input
+  // Note: When UTxO has inline datum (plutusData in output), we don't need to provide datum separately
+  tx.redeemValue({
+    value: meshUtxo,
+    script: {
+      version: "V2", // Aiken compiles to PlutusV2 by default
+      code: contractScript.cbor,
     },
     redeemer: {
       data: {
         alternative: 1, // Release
-        fields: [milestoneId],
+        fields: [
+          // Sanitize milestoneId to hex ByteArray (same as in datum)
+          typeof milestoneId !== "string" ? String(milestoneId) : milestoneId,
+        ].map((id) => {
+          const encoder = new TextEncoder();
+          const bytes = encoder.encode(id);
+          const hex = Array.from(bytes)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          return hex.length < 8
+            ? (hex + Math.floor(Date.now() % 0xffffffff).toString(16).padStart(8, "0")).substring(0, 8)
+            : hex;
+        }),
       },
     },
   });
