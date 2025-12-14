@@ -8,8 +8,9 @@ Auth: JWT in `Authorization: Bearer <token>`. Wallet verify uses signed nonce. A
 - `POST /auth/login` — {email, password} → {token, user}
 - `POST /auth/wallet/verify` — {address, signature, message} → {token, user}
   - Server verifies signature ↔ address; creates/links user; stores pubkeyhash.
-- `GET /users/me` — auth — returns profile.
-- `PATCH /users/me` — auth — update displayName/email/preferredLanguage.
+- `GET /auth/me` — auth — returns profile.
+- `PATCH /auth/me` — auth — update displayName/email.
+- `GET /auth/users` — auth — search users (?role, ?search).
 
 ## Jobs
 - `POST /jobs` — client auth — {title, description, budgetMin, budgetMax, currency, tags, visibility} → {jobId}
@@ -24,17 +25,17 @@ Auth: JWT in `Authorization: Bearer <token>`. Wallet verify uses signed nonce. A
 
 ## Funding / Deposits
 - `POST /contracts/:id/deposit` — client auth
-  - Body: {txHash, amount}
+  - Body: {txHash, amount, signerAddress, signerSignature}
   - Server verifies on-chain: tx pays contractAddress with correct inline datum and amount. Idempotent by txHash.
-  - Response: {status:"PENDING"}
+  - Response: {status:"PENDING"|"CONFIRMED"}
 - `GET /contracts/:id/deposits` — list with status, txHash, blockTime.
 
 ## Milestones & Delivery
 - `POST /contracts/:id/milestones/:mid/submit` — freelancer auth
-  - Body: {files:[url], notes}
+  - Body: {description}
   - Marks milestone SUBMITTED, notifies client.
 - `POST /contracts/:id/milestones/:mid/approve` — client auth
-  - Body optional: {txSignedByClient}
+  - Body optional: {txHash, signerAddress}
   - Approve flow: spend script UTxO with redeemer Approve, pay freelancer, deduct platform fee if configured. Response: {status, txHash?}
 
 ## Payouts / Refunds / Arbitration

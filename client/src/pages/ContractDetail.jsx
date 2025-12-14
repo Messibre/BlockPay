@@ -490,13 +490,13 @@ export default function ContractDetail() {
               <span className={styles.label}>Status:</span>
               <span
                 className={`${styles.status} ${
-                  styles[contract.offchainState?.toLowerCase()] || ""
+                  styles[contract?.offchainState?.toLowerCase()] || ""
                 }`}
               >
-                {contract.offchainState || "Unknown"}
+                {contract?.offchainState || "Unknown"}
               </span>
             </div>
-            {contract.totalAmount && (
+            {contract?.totalAmount && (
               <div className={styles.infoRow}>
                 <span className={styles.label}>Total Amount:</span>
                 <span className={styles.value}>
@@ -622,7 +622,7 @@ export default function ContractDetail() {
           </Modal>
 
           {/* Deposit Status */}
-          {isClient && contract.deposits && contract.deposits.length > 0 && (
+          {isClient && contract?.deposits && contract.deposits.length > 0 && (
             <Card className={styles.depositsSection}>
               <h2>Deposit History</h2>
               <div className={styles.depositList}>
@@ -658,7 +658,7 @@ export default function ContractDetail() {
             </Card>
           )}
 
-          {contract.milestones && contract.milestones.length > 0 && (
+          {contract?.milestones && contract.milestones.length > 0 && (
             <div className={styles.milestones}>
               <h2>Milestones</h2>
               <div className={styles.milestoneList}>

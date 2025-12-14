@@ -30,7 +30,7 @@ See [docs/SETUP.md](docs/SETUP.md) for detailed installation instructions.
 
 ## Repos & Folders
 
-- `frontend/` SPA (wallet connect, deposits, approvals, disputes).
+- `client/` SPA (wallet connect, deposits, approvals, disputes).
 - `backend/` API + chain verifier + reconcile jobs.
 - `contracts/` Aiken sources and build artifacts.
 - `docs/` architecture and API references.
@@ -38,11 +38,12 @@ See [docs/SETUP.md](docs/SETUP.md) for detailed installation instructions.
 
 ## Demo Flow
 
-1. Client posts job and creates contract with milestones.
-2. Client funds escrow (Mesh payToContract) using returned datum/address.
-3. Freelancer submits deliverables; client approves milestone (redeemer Approve).
-4. Payout sent to freelancer; platform fee routed to fee address.
-5. Dispute/refund paths via dedicated redeemers and admin arbitration.
+1. **Client** posts a job and creates a contract with milestones.
+2. **Client** funds the escrow (Mesh payToContract) using the returned datum/address.
+3. **Freelancer** submits their work via the dashboard.
+4. **Client** reviews and approves the milestone (triggering the Release redeemer).
+5. **Smart Contract** automatically sends the payout to the freelancer and routes the platform fee.
+6. Dispute/refund paths available via dedicated redeemers and admin arbitration.
 
 ## Notes
 
@@ -51,33 +52,20 @@ See [docs/SETUP.md](docs/SETUP.md) for detailed installation instructions.
 - Collateral: ensure a 5 ADA collateral UTxO is available for Plutus spends.
 - Security: no private keys ever stored; signatures stay client-side.
 
-## Deploying with Vercel
+## Deployment
 
-- Recommended approach: create two Vercel projects — one using the `client/` folder (frontend) and one using the `backend/` folder (API). Each project should be configured to use the correct root.
-- Alternatively, connect the whole monorepo and set up two projects, each with a `Root Directory` to `client` and `backend` respectively within the Vercel dashboard.
+### Vercel (Recommended)
 
-### Frontend (client)
+This repository is optimized for Vercel. We recommend creating two separate projects:
 
-- Root: `client`
-- Framework: `Other` (Vite) or auto-detected by Vercel
-- Build Command: `npm run build`
-- Output directory: `dist`
-- Environment variables: set `VITE_BACKEND_URL` to your backend deployment URL (example: `https://your-backend.vercel.app/api/v1`).
+1.  **Frontend (`client` folder)**
+    -   Root Directory: `client`
+    -   Framework: Vite
+    -   Build Command: `npm run build`
+    -   Output: `dist`
+    -   Env Vars: `VITE_BACKEND_URL` (point to your backend deployment).
 
-### Backend (API)
-
-- Root: `backend`
-- This repository provides a serverless wrapper at `backend/api/catchall.js` which forwards all `/api/*` requests to the Express `app` (and connects to MongoDB).
-- Build: Vercel will automatically detect `api/` functions in the `backend` project and use `@vercel/node`.
-- Environment variables: `MONGO_URI`, `JWT_SECRET`, `BLOCKFROST_KEY`, `NETWORK`, `PLATFORM_FEE_BPS`, `PLATFORM_FEE_ADDRESS`, `ARBITRATOR_PKH`, `CLIENT_ORIGINS`, `ESCROW_SCRIPT_ADDRESS`.
-
-### Tips
-
-- Set environment variables in the Vercel dashboard for each project (Frontend: `VITE_*` variables; Backend: `MONGO_URI` etc.).
-- For local dev use, copy `ENV.example` to `backend/.env` and `client/.env` and fill values.
-- If you want to deploy the entire monorepo as a single Vercel project, use a custom `vercel.json`, but we recommend the two-project approach for clarity.
-
-If you prefer a single Vercel project, this repo includes a root `vercel.json` that:
-
-- Builds and serves the static frontend from `client/`.
-- Routes `/api/*` to the serverless wrapper at `backend/api/catchall.js`.
+2.  **Backend (`backend` folder)**
+    -   Root Directory: `backend`
+    -   Env Vars: `MONGO_URI`, `JWT_SECRET`, `BLOCKFROST_KEY`, `NETWORK` (preprod), `ESCROW_SCRIPT_ADDRESS`.
+    -   *Note: Includes a serverless wrapper at `api/catchall.js`.*

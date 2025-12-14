@@ -145,7 +145,7 @@ npm run install:all
 
 # Or manually:
 cd backend && npm install
-cd ../frontend && npm install
+cd ../client && npm install
 ```
 
 ### Step 3: Set Up Environment Variables
@@ -173,13 +173,13 @@ ARBITRATOR_PKH=your_arbitrator_pubkeyhash
 CLIENT_ORIGINS=http://localhost:5173
 ```
 
-**Frontend `.env`:**
+**Client `.env`:**
 
 ```bash
-cp ENV.example frontend/.env
+cp ENV.example client/.env
 ```
 
-Edit `frontend/.env`:
+Edit `client/.env`:
 
 ```env
 VITE_BLOCKFROST_KEY=your_blockfrost_project_id
@@ -218,7 +218,7 @@ Edit `backend/.env` and add:
 ESCROW_SCRIPT_ADDRESS=addr_test1wqhuaxvd0x5dyunjlzmc7nsrxur4x5s9xlnvlrwjgefg0qstf3kqv
 ```
 
-Edit `frontend/.env` and add (Vite uses the `VITE_` prefix):
+Edit `client/.env` and add (Vite uses the `VITE_` prefix):
 
 ```env
 VITE_ESCROW_SCRIPT_ADDRESS=addr_test1wqhuaxvd0x5dyunjlzmc7nsrxur4x5s9xlnvlrwjgefg0qstf3kqv
@@ -233,10 +233,10 @@ cd backend
 npm run dev
 ```
 
-**Terminal 2 (Frontend):**
+**Terminal 2 (Client):**
 
 ```bash
-cd frontend
+cd client
 npm run dev
 ```
 

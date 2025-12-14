@@ -183,7 +183,10 @@ export const recordDeposit = async (req, res, next) => {
       });
 
       // If explicitly pending, treat as accepted and record a PENDING payment
-      if (verification.status === 'PENDING' || /not found/i.test(String(verification.error || ''))) {
+      if (
+        verification.status === 'PENDING' ||
+        /not found/i.test(String(verification.error || ''))
+      ) {
         const payment = new Payment({
           contractId,
           paymentType: 'deposit',
@@ -380,19 +383,6 @@ export const approveMilestone = async (req, res, next) => {
 
     await contract.save();
 
-    res.json({
-      message: 'Milestone approved successfully',
-      milestone: {
-        id: milestone.id,
-        status: milestone.status,
-        approvedAt: milestone.approvedAt,
-      },
-      txHash: txHash || null,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
     res.json({
       message: 'Milestone approved successfully',
       milestone: {
