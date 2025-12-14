@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import mongoose from 'mongoose';
 
 import router from './routes/index.js';
+import { ping as pingBlockfrost } from './services/blockfrost.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -59,10 +60,13 @@ app.use(morgan('dev'));
 app.get('/api/v1/health', async (_req, res) => {
   try {
     const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    const bf = await pingBlockfrost().catch((e) => ({ ok: false, error: e.message }));
+
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       database: dbStatus,
+      blockfrost: bf,
     });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });

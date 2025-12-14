@@ -2,38 +2,6 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Background Decoration */
-.home::before {
-  content: '';
-  position: absolute;
-  top: -20%;
-  left: -10%;
-  width: 50%;
-  height: 50%;
-  background: radial-gradient(circle, var(--accent-primary) 0%, transparent 70%);
-  opacity: 0.15;
-  filter: blur(100px);
-  z-index: -1;
-  pointer-events: none;
-}
-
-.home::after {
-  content: '';
-  position: absolute;
-  bottom: -20%;
-  right: -10%;
-  width: 50%;
-  height: 50%;
-  background: radial-gradient(circle, var(--accent-secondary) 0%, transparent 70%);
-  opacity: 0.15;
-  filter: blur(100px);
-  z-index: -1;
-  pointer-events: none;
 }
 
 .container {
@@ -43,217 +11,200 @@
   padding: 4rem 1.5rem;
 }
 
+/* HERO */
 .hero {
   text-align: center;
-  margin-bottom: 6rem;
-  animation: fadeIn 0.8s ease-out;
+  padding: 4rem 0 6rem;
+  max-width: 800px;
+  margin: 0 auto;
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.heroContent h1 {
+  margin-bottom: 1.5rem;
+  letter-spacing: -0.04em;
+}
+
+.tagline {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 3rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* STATUS CARD */
+.statusSection {
+  margin-bottom: 6rem;
+  display: flex;
+  justify-content: center;
+  animation: slideIn 0.8s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.statusCard {
+  width: 100%;
+  max-width: 600px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.statusContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.value {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.roleBadge {
+  display: inline-block;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  margin-left: 0.5rem;
+  text-transform: capitalize;
+  border: 1px solid var(--border-color);
+}
+
+.walletInfo {
+  text-align: right;
+}
+
+.connected, .disconnected {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.connected { color: var(--success); }
+.disconnected { color: var(--text-secondary); }
+
+.dot, .dotRed {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.dotRed { background: var(--text-tertiary); }
+
+
+/* FEATURES */
+.features {
+  margin-bottom: 8rem;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.sectionHeader h2 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.sectionHeader p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+.featureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 2rem;
+}
+
+.featureCard {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  height: 100%;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+}
+
+.iconWrapper {
+  width: 48px;
+  height: 48px;
+  background: var(--bg-tertiary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  border: 1px solid var(--border-color);
+  font-family: var(--font-display);
+}
+
+.featureCard h3 {
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+}
+
+.featureCard p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* CTA */
+.cta {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.cta h2 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.cta p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-.hero h1 {
-  font-size: 4rem;
-  font-weight: 800;
-  margin-bottom: 1.5rem;
-  line-height: 1.1;
-  background: linear-gradient(135deg, var(--text-primary) 30%, var(--accent-primary));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.tagline {
-  font-size: 1.5rem;
-  color: var(--text-secondary);
-  max-width: 700px;
-  margin: 0 auto 3rem;
-  line-height: 1.5;
-}
-
-.welcomeSection {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  padding: 2.5rem;
-  border-radius: var(--radius-lg);
-  display: inline-block;
-  text-align: left;
-  min-width: 350px;
-  box-shadow: var(--glass-shadow);
-}
-
-.welcomeSection h2 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.userInfo {
-  margin-bottom: 1.5rem;
-  color: var(--text-secondary);
-  font-size: 1rem;
-}
-
-.userInfo strong {
-  color: var(--text-primary);
-  text-transform: capitalize;
-}
-
-.userInfo code {
-  background: rgba(0,0,0,0.2);
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-}
-
-.walletStatus {
-  margin-bottom: 2rem;
-  color: var(--success);
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.button, .buttonSecondary, .buttonTertiary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem 2rem;
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  font-size: 1.1rem;
-  transition: all 0.2s;
-  min-width: 160px;
-}
-
-.button {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-hover));
-  color: white;
-  box-shadow: 0 4px 6px -1px var(--accent-glow);
-}
-
-.button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px var(--accent-glow);
-}
-
-.buttonSecondary {
-  background: var(--bg-surface);
-  border: 1px solid var(--accent-primary);
-  color: var(--accent-primary);
-}
-
-.buttonSecondary:hover {
-  background: rgba(99, 102, 241, 0.1);
-  transform: translateY(-2px);
-}
-
-.buttonTertiary {
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.buttonTertiary:hover {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
-/* Features Section */
-.features {
-  margin-top: 4rem;
-}
-
-.features h2 {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 3rem;
-  color: var(--text-primary);
-}
-
-.featureGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 2rem;
-}
-
-.feature {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  padding: 2rem;
-  border-radius: var(--radius-lg);
-  text-align: center;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.feature:hover {
-  transform: translateY(-5px);
-  border-color: var(--accent-primary);
-  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.2);
-}
-
-.feature h3 {
-  font-size: 1.25rem;
-  margin-bottom: 1rem;
-  color: var(--text-primary);
-}
-
-.feature p {
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
-
-.walletPrompt {
-  margin-top: 6rem;
-  text-align: center;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
-  padding: 4rem;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-color);
-}
-
-.walletPrompt h2 {
-  font-size: 2rem;
-  margin-bottom: 1rem;
-}
-
-.walletPrompt p {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.walletHint {
-  font-size: 0.9rem !important;
-  color: var(--text-tertiary) !important;
-  margin-top: 1rem;
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 768px) {
-  .hero h1 {
-    font-size: 2.5rem;
-  }
-  
-  .tagline {
-    font-size: 1.1rem;
-  }
-  
-  .actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .button, .buttonSecondary, .buttonTertiary {
-    width: 100%;
-  }
+  .hero { padding: 2rem 0 4rem; }
+  .hero h1 { font-size: 2.5rem; }
+  .statusContent { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  .walletInfo { text-align: left; }
 }

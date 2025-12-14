@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useToast } from "../contexts/ToastContext.jsx";
 import api from "../services/api.js";
+import Input from "../components/Input.jsx";
+import BackButton from "../components/BackButton.jsx";
 import styles from "./Auth.module.css";
 
 export default function Register() {
@@ -42,53 +44,49 @@ export default function Register() {
   return (
     <div className={styles.auth}>
       <div className={styles.container}>
+        <BackButton />
         <h1>Register</h1>
         <form onSubmit={handleSubmit} className={styles.form}>
           {error && <div className={styles.error}>{error}</div>}
-          <div className={styles.field}>
-            <label>Display Name</label>
-            <input
-              type="text"
-              value={formData.displayName}
-              onChange={(e) =>
-                setFormData({ ...formData, displayName: e.target.value })
-              }
-              required
-            />
-          </div>
-          <div className={styles.field}>
-            <label>Email</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              required
-            />
-          </div>
-          <div className={styles.field}>
-            <label>Password</label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-              required
-            />
-          </div>
-          <div className={styles.field}>
-            <label>Wallet Address (Optional)</label>
-            <input
-              type="text"
-              value={formData.walletAddress}
-              onChange={(e) =>
-                setFormData({ ...formData, walletAddress: e.target.value })
-              }
-              placeholder="You can connect your wallet after registration"
-            />
-          </div>
+          <Input
+            label="Display Name"
+            type="text"
+            value={formData.displayName}
+            onChange={(e) =>
+              setFormData({ ...formData, displayName: e.target.value })
+            }
+            required
+            placeholder="e.g. John Doe"
+          />
+          <Input
+            label="Email"
+            type="email"
+            value={formData.email}
+            onChange={(e) =>
+              setFormData({ ...formData, email: e.target.value })
+            }
+            required
+            placeholder="name@example.com"
+          />
+          <Input
+            label="Password"
+            type="password"
+            value={formData.password}
+            onChange={(e) =>
+              setFormData({ ...formData, password: e.target.value })
+            }
+            required
+            placeholder="Create a strong password"
+          />
+          <Input
+            label="Wallet Address (Optional)"
+            type="text"
+            value={formData.walletAddress}
+            onChange={(e) =>
+              setFormData({ ...formData, walletAddress: e.target.value })
+            }
+            placeholder="You can connect your wallet after registration"
+          />
           <div className={styles.field}>
             <label>Role</label>
             <select

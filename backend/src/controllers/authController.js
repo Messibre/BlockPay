@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import messageSigning from '@emurgo/cardano-message-signing-nodejs';
+const { verifyMessage } = messageSigning;
 
 const generateToken = (userId, role) => {
   return jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -116,10 +118,58 @@ export const verifyWallet = async (req, res, next) => {
     if (!isValidAddress(address)) {
       return res.status(400).json({ message: 'Invalid wallet address format' });
     }
-    // TODO: Verify signature matches address using CIP-30 verification
-    // For now, we'll trust the wallet connection and create/link user
+    // Verify signature using emurgo library (CIP-30 signatures)
+    let valid = false;
+    try {
+      valid = verifyMessage(signature, address, message);
+    } catch (e) {
+      // Keep valid=false
+      console.warn('Signature verification error', e.message || e);
+    }
 
-    let user = await User.findOne({ walletAddress: address });
+    if (!valid) {
+      return res.status(400).json({ message: 'Signature verification failed' });
+    }
+
+    // If an Authorization token is present, link wallet to that user
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(payload.userId);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        // Prevent duplicate
+        if (!user.wallets?.some((w) => w.address === address)) {
+          user.wallets = user.wallets || [];
+          user.wallets.push({ address, isPrimary: user.wallets.length === 0 });
+        }
+        // Set walletAddress if missing
+        if (!user.walletAddress) user.walletAddress = address;
+
+        await user.save();
+
+        const newToken = generateToken(user._id, user.role);
+        return res.json({
+          token: newToken,
+          user: {
+            id: user._id,
+            name: user.fullName,
+            email: user.email,
+            role: user.role,
+            walletAddress: user.walletAddress,
+            wallets: user.wallets,
+          },
+        });
+      } catch (e) {
+        console.warn('Auth token invalid for wallet link', e.message || e);
+        // fall through to create/find user behavior
+      }
+    }
+
+    // No auth token, behave as login/signup via wallet
+    let user = await User.findOne({ wallets: { $elemMatch: { address } } });
 
     if (!user) {
       // Create wallet-only user
@@ -178,6 +228,29 @@ export const updateMe = async (req, res, next) => {
     }).select('-passwordHash');
 
     res.json(user);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getUsers = async (req, res, next) => {
+  try {
+    const { role, search } = req.query;
+    const query = {};
+
+    if (role) {
+      query.role = role;
+    }
+
+    if (search) {
+      query.$or = [
+        { fullName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const users = await User.find(query).select('-passwordHash -wallets');
+    res.json(users);
   } catch (error) {
     next(error);
   }

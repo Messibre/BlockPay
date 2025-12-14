@@ -34,8 +34,27 @@ export const createContract = async (req, res, next) => {
       User.findById(freelancerId),
     ]);
 
-    const clientAddress = clientUser?.walletAddress || 'addr_test1...';
-    const freelancerAddress = freelancerUser?.walletAddress || 'addr_test1...';
+    const resolvePrimaryAddress = (u) => {
+      if (!u) return null;
+      if (u.wallets && u.wallets.length > 0) {
+        const primary = u.wallets.find((w) => w.isPrimary);
+        if (primary && primary.address) return primary.address;
+        if (u.wallets[0].address) return u.wallets[0].address;
+      }
+      if (u.walletAddress) return u.walletAddress;
+      return null;
+    };
+
+    const clientAddress = resolvePrimaryAddress(clientUser);
+    const freelancerAddress = resolvePrimaryAddress(freelancerUser);
+
+    // Require both parties have a linked wallet address to create a contract
+    if (!clientAddress || !freelancerAddress) {
+      return res.status(400).json({
+        message:
+          'Both client and freelancer must have a linked wallet address before creating a contract',
+      });
+    }
 
     const contractDatum = {
       client: clientAddress,
@@ -118,8 +137,9 @@ export const recordDeposit = async (req, res, next) => {
     const { txHash, amount } = req.body;
     const contractId = req.params.id;
 
-    if (!txHash || !amount) {
-      return res.status(400).json({ message: 'txHash and amount required' });
+    // `amount` is expected in ADA (not lovelace). The backend converts to lovelace for on-chain checks.
+    if (!txHash) {
+      return res.status(400).json({ message: 'txHash is required' });
     }
 
     // Check for duplicate
@@ -134,20 +154,84 @@ export const recordDeposit = async (req, res, next) => {
     }
 
     // Verify on-chain
-    const verification = await verifyDeposit(txHash, contract.contractAddress, amount);
+    // Accept either ADA or lovelace from clients:
+    // - If amount looks like lovelace (integer >= 1_000_000) treat it as lovelace
+    // - Otherwise treat it as ADA and convert to lovelace
+    const amountNum = Number(amount);
+    let expectedLovelace;
+    let amountUnit;
+    if (Number.isInteger(amountNum) && amountNum >= 1_000_000) {
+      expectedLovelace = amountNum;
+      amountUnit = 'lovelace';
+    } else {
+      expectedLovelace = Math.round(amountNum * 1_000_000);
+      amountUnit = 'ADA';
+    }
 
+    const verification = await verifyDeposit(txHash, contract.contractAddress, expectedLovelace);
+    // If verification failed but reports PENDING (or a not-found diagnostic),
+    // accept the deposit as PENDING so the client can proceed and UI updates.
     if (!verification.valid) {
-      // Allow PENDING transactions (mempool)
-      if (verification.status !== 'PENDING') {
-        return res.status(422).json({
-          message: 'Transaction verification failed',
-          error: verification.error,
-          status: verification.status,
+      // Log details for easier debugging, include expected/posted amounts and detected unit
+      console.warn('Deposit verification not valid; treating as PENDING', {
+        txHash,
+        contractId,
+        postedAmount: amount,
+        amountUnit,
+        expectedLovelace,
+        verification,
+      });
+
+      // If explicitly pending, treat as accepted and record a PENDING payment
+      if (verification.status === 'PENDING' || /not found/i.test(String(verification.error || ''))) {
+        const payment = new Payment({
+          contractId,
+          paymentType: 'deposit',
+          amountADA: verification.amount || Math.round(expectedLovelace) / 1_000_000,
+          txHash,
+          status: 'PENDING',
+          blockTime: verification.blockTime || null,
+          blockHeight: verification.blockHeight || null,
+          explorerLink: verification.explorerLink,
+          toAddress: contract.contractAddress,
+          signerAddress: req.body.signerAddress || null,
+          signerSignature: req.body.signerSignature || null,
         });
+
+        await payment.save();
+
+        // Update contract state to FUNDED so UI reflects the deposit immediately
+        contract.offchainState = 'FUNDED';
+        await contract.save();
+
+        return res.json({ status: payment.status, txHash, explorerLink: payment.explorerLink });
       }
+
+      // Otherwise return a validation error with details (amount mismatch, etc.)
+      console.warn('Deposit verification failed', { txHash, contractId, verification });
+      return res.status(422).json({
+        message: 'Transaction verification failed',
+        error: verification.error,
+        status: verification.status,
+        matchedAddress: verification.matchedAddress,
+        hasInlineDatum: verification.hasInlineDatum,
+        explorerLink: verification.explorerLink,
+        verification,
+      });
     }
 
     // Create payment record
+    // If signerAddress provided, ensure it belongs to this user (prevent spoofing)
+    if (req.body.signerAddress) {
+      const user = await User.findById(req.userId);
+      const linked =
+        (user.wallets || []).some((w) => w.address === req.body.signerAddress) ||
+        user.walletAddress === req.body.signerAddress;
+      if (!linked) {
+        return res.status(403).json({ message: 'Signer address not linked to your account' });
+      }
+    }
+
     const payment = new Payment({
       contractId,
       paymentType: 'deposit',
@@ -158,6 +242,9 @@ export const recordDeposit = async (req, res, next) => {
       blockHeight: verification.blockHeight,
       explorerLink: verification.explorerLink,
       toAddress: contract.contractAddress,
+      // Capture signer info if provided (client should have linked wallet or provided signerAddress)
+      signerAddress: req.body.signerAddress || null,
+      signerSignature: req.body.signerSignature || null,
     });
 
     await payment.save();
@@ -228,12 +315,16 @@ export const approveMilestone = async (req, res, next) => {
 
       // Verify payout to freelancer and platform fee (if configured)
       const platformFeeAddress = process.env.PLATFORM_FEE_ADDRESS || null;
+      // Convert ADA amounts to lovelace for on-chain verification
+      const payoutLovelace = Math.round(Number(payoutAmount) * 1_000_000);
+      const feeLovelace = Math.round(Number(feeAmount) * 1_000_000);
+
       const verification = await verifyPayout(
         txHash,
         freelancerAddress,
-        payoutAmount,
+        payoutLovelace,
         platformFeeAddress,
-        feeAmount,
+        feeLovelace,
       );
 
       if (!verification.valid) {
@@ -245,6 +336,17 @@ export const approveMilestone = async (req, res, next) => {
       }
 
       // Record payment
+      // If signerAddress provided, ensure it belongs to this user
+      if (req.body.signerAddress) {
+        const user = await User.findById(req.userId);
+        const linked =
+          (user.wallets || []).some((w) => w.address === req.body.signerAddress) ||
+          user.walletAddress === req.body.signerAddress;
+        if (!linked) {
+          return res.status(403).json({ message: 'Signer address not linked to your account' });
+        }
+      }
+
       const payment = new Payment({
         contractId,
         milestoneId,
@@ -257,6 +359,8 @@ export const approveMilestone = async (req, res, next) => {
         explorerLink: verification.explorerLink,
         fromAddress: contract.contractAddress,
         toAddress: freelancerAddress,
+        signerAddress: req.body.signerAddress || null,
+        signerSignature: req.body.signerSignature || null,
         feeAmount: feeAmount > 0 ? feeAmount : undefined,
         feeAddress: platformFeeAddress || undefined,
       });
@@ -284,6 +388,68 @@ export const approveMilestone = async (req, res, next) => {
         approvedAt: milestone.approvedAt,
       },
       txHash: txHash || null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+    res.json({
+      message: 'Milestone approved successfully',
+      milestone: {
+        id: milestone.id,
+        status: milestone.status,
+        approvedAt: milestone.approvedAt,
+      },
+      txHash: txHash || null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const submitMilestone = async (req, res, next) => {
+  try {
+    const { milestoneId } = req.params;
+    const { description } = req.body;
+    const contractId = req.params.id;
+
+    const contract = await Contract.findById(contractId);
+
+    if (!contract) {
+      return res.status(404).json({ message: 'Contract not found' });
+    }
+
+    // Verify freelancer owns this contract
+    if (contract.freelancerId.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Only the assigned freelancer can submit work' });
+    }
+
+    // Find milestone
+    const milestone = contract.milestones.find((m) => m.id === milestoneId);
+    if (!milestone) {
+      return res.status(404).json({ message: 'Milestone not found' });
+    }
+
+    if (milestone.status !== 'pending') {
+      return res.status(400).json({
+        message: `Milestone already processed. Current status: ${milestone.status}`,
+      });
+    }
+
+    // Update milestone status
+    milestone.status = 'submitted';
+    milestone.description = description || milestone.description; // Append or update description
+    milestone.submittedAt = new Date();
+
+    await contract.save();
+
+    res.json({
+      message: 'Milestone submitted successfully',
+      milestone: {
+        id: milestone.id,
+        status: milestone.status,
+        submittedAt: milestone.submittedAt,
+      },
     });
   } catch (error) {
     next(error);

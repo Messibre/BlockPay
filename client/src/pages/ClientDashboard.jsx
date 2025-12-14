@@ -13,7 +13,6 @@ function ClientDashboardContent() {
   const { user } = useAuth();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-  // Mock data - replace with actual API calls
   // Fetch dashboard stats from backend
   const {
     data: stats,
@@ -36,23 +35,8 @@ function ClientDashboardContent() {
     // Continue with initialData or show alert - for now just log
   }
 
-  const notifications = [
-    {
-      id: 1,
-      message: "New proposal received for 'React Developer'",
-      time: "2 hours ago",
-    },
-    {
-      id: 2,
-      message: "Payment confirmation for Contract #123",
-      time: "1 day ago",
-    },
-    {
-      id: 3,
-      message: "Contract updated: 'Web Design Project'",
-      time: "2 days ago",
-    },
-  ];
+  // No notifications by default
+  const notifications = [];
 
   return (
     <div className={styles.dashboard}>

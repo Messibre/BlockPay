@@ -10,6 +10,9 @@ import Button from "../components/Button.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import Breadcrumbs from "../components/Breadcrumbs.jsx";
 import api from "../services/api.js";
+import WalletPicker from "../components/WalletPicker.jsx";
+import Modal from "../components/Modal.jsx";
+import BackButton from "../components/BackButton.jsx";
 import {
   buildDepositTransaction,
   buildReleaseTransaction,
@@ -27,6 +30,14 @@ export default function ContractDetail() {
   const queryClient = useQueryClient();
   const [isDepositing, setIsDepositing] = useState(false);
   const [isApproving, setIsApproving] = useState({});
+  const [isWalletPickerOpen, setIsWalletPickerOpen] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState(null);
+  const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
+  const [isLinking, setIsLinking] = useState(false);
+  // Submission modal state (declared here to preserve hook order across renders)
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [submissionNote, setSubmissionNote] = useState("");
+  const [selectedMilestone, setSelectedMilestone] = useState(null);
 
   const {
     data: contract,
@@ -114,6 +125,28 @@ export default function ContractDetail() {
       showError("Please connect your wallet first");
       return;
     }
+
+    // Open wallet picker first
+    setIsWalletPickerOpen(true);
+  };
+
+  const onWalletSelected = async (addr) => {
+    setIsWalletPickerOpen(false);
+    if (!addr) return;
+    setSelectedWallet(addr);
+
+    // If selected matches connected, proceed
+    if (addr === address) {
+      await proceedWithDeposit(addr, null);
+      return;
+    }
+
+    // If user selected a different saved wallet, ask them to switch or link
+    setIsSwitchModalOpen(true);
+  };
+
+  const proceedWithDeposit = async (signerAddr, signerSignature) => {
+    setIsDepositing(true);
     try {
       // Basic address validator
       const isBech32 = (s) =>
@@ -151,13 +184,13 @@ export default function ContractDetail() {
       }
 
       const feeAddr = isBech32(contract.datum?.feeAddress)
-        ? contract.datum.feeAddress
+        ? contract.datum?.feeAddress
         : isBech32(address)
         ? address
         : null;
 
       const arbitratorAddr = isBech32(contract.datum?.arbitrator)
-        ? contract.datum.arbitrator
+        ? contract.datum?.arbitrator
         : isBech32(address)
         ? address
         : null;
@@ -189,16 +222,84 @@ export default function ContractDetail() {
         datum
       );
 
-      // Record deposit with backend
-      await api.recordDeposit(id, txHash, contract.totalAmount);
+      // Record deposit with backend (include signer info if present)
+      await api.recordDeposit(
+        id,
+        txHash,
+        contract.totalAmount,
+        signerAddr,
+        signerSignature
+      );
 
       success(`Deposit transaction submitted! TX: ${txHash.slice(0, 16)}...`);
       queryClient.invalidateQueries(["contract", id]);
     } catch (error) {
       console.error("Deposit error:", error);
-      showError(error.message || "Failed to deposit funds. Please try again.");
+      const serverMessage = error.response?.data?.message;
+      const serverError = error.response?.data?.error;
+      const explorerLink = error.response?.data?.explorerLink;
+      const verification = error.response?.data?.verification;
+      const detail = serverMessage || serverError || error.message;
+      // Show concise message to user, but log full verification details for debugging
+      showError(detail || "Failed to deposit funds. Please try again.");
+      if (explorerLink) console.info("TX explorer:", explorerLink);
+      if (verification)
+        console.info("Deposit verification details:", verification);
     } finally {
       setIsDepositing(false);
+      setSelectedWallet(null);
+    }
+  };
+
+  const trySwitchingWallet = async () => {
+    // Check current address; if matches selectedWallet, proceed
+    if (address === selectedWallet) {
+      setIsSwitchModalOpen(false);
+      await proceedWithDeposit(address, null);
+      return;
+    }
+
+    // Otherwise prompt user to switch in their extension
+    showError(
+      'Please switch the active account in your wallet extension, then click "I switched"'
+    );
+  };
+
+  const signAndLinkCurrent = async () => {
+    if (!wallet || !address) {
+      showError("Connect your wallet first");
+      return;
+    }
+    setIsLinking(true);
+    try {
+      const message = `Link blockPay account at ${Date.now()}`;
+      // sign message using CIP-30 signData (payload as hex)
+      const encoder = new TextEncoder();
+      const payloadHex = Array.from(encoder.encode(message))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      const sigObj = await wallet.signData(address, payloadHex);
+      const signature = sigObj?.signature || sigObj; // some wallets return object
+
+      // Call verify endpoint to link
+      const res = await api.verifyWallet(address, signature, message);
+      // Update auth (token + user)
+      const newToken = res.token;
+      const newUser = res.user;
+      localStorage.setItem("token", newToken);
+      // Force a page refresh of auth context by reloading (or call a login method if available)
+      window.location.reload();
+
+      // Proceed with deposit using connected wallet
+      setIsSwitchModalOpen(false);
+      await proceedWithDeposit(address, signature);
+    } catch (e) {
+      console.error("Sign & link failed", e);
+      showError(
+        e.response?.data?.message || e.message || "Failed to sign & link wallet"
+      );
+    } finally {
+      setIsLinking(false);
     }
   };
 
@@ -322,9 +423,32 @@ export default function ContractDetail() {
     }
   };
 
+  const openSubmitModal = (milestone) => {
+    setSelectedMilestone(milestone);
+    setSubmissionNote("");
+    setIsSubmitModalOpen(true);
+  };
+
+  const handleSubmitWork = async () => {
+    if (!selectedMilestone) return;
+
+    try {
+      await api.submitMilestone(id, selectedMilestone.id, {
+        description: submissionNote,
+      });
+      success("Work submitted for review!");
+      queryClient.invalidateQueries(["contract", id]);
+      setIsSubmitModalOpen(false);
+    } catch (error) {
+      console.error("Submit work error:", error);
+      showError(error.response?.data?.message || "Failed to submit work");
+    }
+  };
+
   return (
     <div className={styles.contractDetail}>
       <div className={styles.container}>
+        <BackButton />
         <Breadcrumbs
           items={[
             { label: "Home", path: "/" },
@@ -419,6 +543,84 @@ export default function ContractDetail() {
             </Card>
           )}
 
+          <WalletPicker
+            isOpen={isWalletPickerOpen}
+            onClose={() => setIsWalletPickerOpen(false)}
+            onSelect={onWalletSelected}
+          />
+
+          <Modal
+            isOpen={isSwitchModalOpen}
+            onClose={() => setIsSwitchModalOpen(false)}
+            title="Wallet mismatch"
+          >
+            <p>
+              The wallet you selected is not the currently connected wallet. You
+              can switch accounts in your wallet extension and click{" "}
+              <strong>I switched</strong>, or use the currently connected wallet
+              and link it to your account.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <Button onClick={trySwitchingWallet} disabled={isDepositing}>
+                I switched
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={signAndLinkCurrent}
+                disabled={isLinking}
+              >
+                {isLinking ? "Linking..." : "Use connected & link"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setIsSwitchModalOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </Modal>
+
+          <Modal
+            isOpen={isSubmitModalOpen}
+            onClose={() => setIsSubmitModalOpen(false)}
+            title="Submit Work for Review"
+          >
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+            >
+              <p>Describe the work you have completed for this milestone.</p>
+              <textarea
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  borderRadius: "0.5rem",
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                  minHeight: "100px",
+                }}
+                placeholder="Enter submission notes/links..."
+                value={submissionNote}
+                onChange={(e) => setSubmissionNote(e.target.value)}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "0.5rem",
+                }}
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsSubmitModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSubmitWork}>Submit for Approval</Button>
+              </div>
+            </div>
+          </Modal>
+
           {/* Deposit Status */}
           {isClient && contract.deposits && contract.deposits.length > 0 && (
             <Card className={styles.depositsSection}>
@@ -480,10 +682,7 @@ export default function ContractDetail() {
                       <Button
                         variant="primary"
                         className={styles.actionButton}
-                        onClick={() => {
-                          // TODO: Implement milestone submission
-                          alert("Milestone submission coming soon!");
-                        }}
+                        onClick={() => openSubmitModal(milestone)}
                       >
                         Submit Work
                       </Button>

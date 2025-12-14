@@ -10,27 +10,15 @@ function FreelancerDashboardContent() {
   const { user } = useAuth();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-  // Mock data - replace with actual API calls
+  // Show empty stats and no notifications by default
   const stats = {
-    jobsRecommended: 12,
-    activeContracts: 2,
-    pendingProposals: 3,
-    totalEarnings: 8500,
+    jobsRecommended: 0,
+    activeContracts: 0,
+    pendingProposals: 0,
+    totalEarnings: 0,
   };
 
-  const notifications = [
-    {
-      id: 1,
-      message: "New job matches your skills: 'React Developer'",
-      time: "1 hour ago",
-    },
-    {
-      id: 2,
-      message: "Proposal accepted for 'Web Design Project'",
-      time: "3 hours ago",
-    },
-    { id: 3, message: "Payment received: 500 ADA", time: "1 day ago" },
-  ];
+  const notifications = [];
 
   return (
     <div className={styles.dashboard}>

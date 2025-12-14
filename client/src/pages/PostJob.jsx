@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useToast } from "../contexts/ToastContext.jsx";
 import api from "../services/api.js";
+import Input from "../components/Input.jsx";
+import Select from "../components/Select.jsx";
+import Button from "../components/Button.jsx";
 import styles from "./PostJob.module.css";
 
 export default function PostJob() {
@@ -58,7 +61,7 @@ export default function PostJob() {
         title: formData.title,
         description: formData.description,
         tags: formData.tags,
-        budgetMin: Number(formData.budgetMin) * 1000000, // Convert ADA to lovelace
+        budgetMin: Number(formData.budgetMin) * 1000000,
         budgetMax: Number(formData.budgetMax) * 1000000,
         deadline: formData.deadline,
         experienceLevel: formData.experienceLevel,
@@ -90,29 +93,35 @@ export default function PostJob() {
     );
   }
 
+  const experienceOptions = [
+    { value: "beginner", label: "Beginner" },
+    { value: "intermediate", label: "Intermediate" },
+    { value: "advanced", label: "Advanced" },
+    { value: "expert", label: "Expert" },
+  ];
+
   return (
     <div className={styles.postJob}>
       <div className={styles.container}>
+        <BackButton />
         <h1>Post a New Job</h1>
-        <form onSubmit={handleSubmit} className={styles.form}>
+        <form onSubmit={handleSubmit} className={styles.form} encType="multipart/form-data">
           {error && <div className={styles.error}>{error}</div>}
 
-          <div className={styles.field}>
-            <label>Job Title *</label>
-            <input
-              type="text"
+          <div className={styles.section}>
+            <Input
+              label="Job Title *"
               value={formData.title}
               onChange={(e) =>
                 setFormData({ ...formData, title: e.target.value })
               }
-              placeholder="e.g., React Developer Needed"
+              placeholder="e.g., React Developer Needed to Build Dashboard"
               required
             />
-          </div>
 
-          <div className={styles.field}>
-            <label>Description *</label>
-            <textarea
+            <Input
+              label="Description *"
+              type="textarea"
               value={formData.description}
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
@@ -120,100 +129,95 @@ export default function PostJob() {
               placeholder="Describe the job requirements, deliverables, and expectations..."
               rows={8}
               required
+              className={styles.textarea}
             />
           </div>
 
-          <div className={styles.field}>
-            <label>Required Skills</label>
-            <div className={styles.tagInput}>
-              <input
-                type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addTag();
-                  }
-                }}
-                placeholder="Add a skill and press Enter"
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                className={styles.addTagBtn}
-              >
-                Add
-              </button>
-            </div>
-            {formData.tags.length > 0 && (
-              <div className={styles.tags}>
-                {formData.tags.map((tag) => (
-                  <span key={tag} className={styles.tag}>
-                    {tag}
+          <div className={styles.row}>
+            <div className={styles.field}>
+              <label className={styles.label}>Required Skills</label>
+              <div className={styles.tagInputWrapper}>
+                <div className={styles.tagInput}>
+                    <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                            e.preventDefault();
+                            addTag();
+                        }
+                        }}
+                        placeholder="Type skill & press Enter"
+                        className={styles.inputReset}
+                    />
                     <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className={styles.removeTag}
+                        type="button"
+                        onClick={addTag}
+                        className={styles.addTagBtn}
                     >
-                      ×
+                        Add
                     </button>
-                  </span>
-                ))}
+                </div>
               </div>
-            )}
-          </div>
-
-          <div className={styles.row}>
-            <div className={styles.field}>
-              <label>Minimum Budget (ADA) *</label>
-              <input
-                type="number"
-                value={formData.budgetMin}
-                onChange={(e) =>
-                  setFormData({ ...formData, budgetMin: e.target.value })
-                }
-                min="0"
-                step="0.1"
-                required
-              />
+              {formData.tags.length > 0 && (
+                <div className={styles.tags}>
+                  {formData.tags.map((tag) => (
+                    <span key={tag} className={styles.tag}>
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className={styles.removeTag}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-
-            <div className={styles.field}>
-              <label>Maximum Budget (ADA) *</label>
-              <input
-                type="number"
-                value={formData.budgetMax}
-                onChange={(e) =>
-                  setFormData({ ...formData, budgetMax: e.target.value })
-                }
-                min="0"
-                step="0.1"
-                required
-              />
-            </div>
-          </div>
-
-          <div className={styles.row}>
-            <div className={styles.field}>
-              <label>Experience Level *</label>
-              <select
+            
+             <Select
+                label="Experience Level *"
+                options={experienceOptions}
                 value={formData.experienceLevel}
                 onChange={(e) =>
                   setFormData({ ...formData, experienceLevel: e.target.value })
                 }
                 required
-              >
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="expert">Expert</option>
-              </select>
-            </div>
+              />
+          </div>
 
-            <div className={styles.field}>
-              <label>Deadline *</label>
-              <input
+          <div className={styles.row}>
+            <Input
+              label="Minimum Budget (ADA) *"
+              type="number"
+              value={formData.budgetMin}
+              onChange={(e) =>
+                setFormData({ ...formData, budgetMin: e.target.value })
+              }
+              min="0"
+              step="0.1"
+              required
+            />
+
+            <Input
+              label="Maximum Budget (ADA) *"
+              type="number"
+              value={formData.budgetMax}
+              onChange={(e) =>
+                setFormData({ ...formData, budgetMax: e.target.value })
+              }
+              min="0"
+              step="0.1"
+              required
+            />
+          </div>
+
+           <div className={styles.row}>
+             <Input
+                label="Deadline *"
                 type="date"
                 value={formData.deadline}
                 onChange={(e) =>
@@ -222,43 +226,42 @@ export default function PostJob() {
                 min={new Date().toISOString().split("T")[0]}
                 required
               />
-            </div>
-          </div>
-
-          <div className={styles.field}>
-            <label>Attachments (Optional)</label>
-            <input
-              type="file"
-              onChange={(e) =>
-                setFormData({ ...formData, file: e.target.files[0] })
-              }
-              accept=".pdf,.doc,.docx,.txt"
-            />
-            <small>
-              Upload project brief, requirements, or reference files (PDF, DOC,
-              TXT)
-            </small>
-          </div>
+               <Input
+                label="Attachments (Optional)"
+                type="file"
+                onChange={(e) =>
+                    setFormData({ ...formData, file: e.target.files[0] })
+                }
+                accept=".pdf,.doc,.docx,.txt"
+                helperText="Upload PDF, DOC, or TXT"
+                />
+           </div>
 
           <div className={styles.actions}>
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={() => {
                 setIsDraft(true);
-                handleSubmit({ preventDefault: () => {} });
+                // Trigger form submission manually since it's type="button"
+                // But we need to handle valiation. For now just set state.
+                // The actual submit needs to be triggered.
+                // Simplified: use a hidden submit or call handler directly if valid.
+                // For this refactor, let's just use the main submit for now.
+                 const fakeEvent = { preventDefault: () => {} };
+                 handleSubmit(fakeEvent);
               }}
-              className={styles.buttonDraft}
               disabled={isSubmitting}
             >
               Save as Draft
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className={styles.button}
               disabled={isSubmitting}
+              className={styles.submitBtn}
             >
               {isSubmitting ? "Posting..." : "Post Job"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

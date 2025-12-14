@@ -9,6 +9,7 @@ router.get('/:id', authenticate, contractController.getContract);
 router.post('/:id/deposit', authenticate, contractController.recordDeposit);
 router.get('/:id/deposits', authenticate, contractController.getDeposits);
 router.post('/:id/milestones/:milestoneId/approve', authenticate, contractController.approveMilestone);
+router.post('/:id/milestones/:milestoneId/submit', authenticate, contractController.submitMilestone);
 router.get('/', authenticate, contractController.getMyContracts);
 
 export default router;

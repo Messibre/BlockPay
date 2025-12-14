@@ -1,15 +1,17 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import Card from "../components/Card.jsx";
 import Button from "../components/Button.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
+import BackButton from "../components/BackButton.jsx";
 import Breadcrumbs from "../components/Breadcrumbs.jsx";
 import api from "../services/api.js";
 import styles from "./JobDetail.module.css";
 
 export default function JobDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const {
     data: job,
@@ -21,12 +23,7 @@ export default function JobDetail() {
   });
 
   if (isLoading) {
-    return (
-      <div className={styles.loadingContainer}>
-        <LoadingSpinner size="large" />
-        <p>Loading job details...</p>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (error || !job) {

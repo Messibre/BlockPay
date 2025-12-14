@@ -7,7 +7,12 @@ export const verifyDeposit = async (txHash, contractAddress, expectedAmount) => 
   try {
     const tx = await getTransaction(txHash);
     if (!tx) {
-      return { valid: false, error: 'Transaction not found' };
+      return {
+        valid: false,
+        error: 'Transaction not found',
+        status: 'PENDING',
+        explorerLink: getExplorerLink(txHash),
+      };
     }
 
     if (tx.block === null) {
@@ -16,14 +21,26 @@ export const verifyDeposit = async (txHash, contractAddress, expectedAmount) => 
 
     const utxos = await getTransactionUtxos(txHash);
     if (!utxos) {
-      return { valid: false, error: 'UTxOs not found' };
+      return { valid: false, error: 'UTxOs not found', explorerLink: getExplorerLink(txHash) };
     }
 
     // Check outputs for contract address
-    const outputToContract = utxos.outputs?.find((out) => out.address === contractAddress);
+    let outputToContract = utxos.outputs?.find((out) => out.address === contractAddress);
+
+    // Fallback: some wallets submit to the script address but blockfrost may return inline datum
+    // or a different address; try to find any output that looks like a script output (has inline_datum or data_hash)
+    if (!outputToContract) {
+      outputToContract = utxos.outputs?.find((out) => out.inline_datum || out.data_hash);
+    }
 
     if (!outputToContract) {
-      return { valid: false, error: 'No output to contract address found' };
+      // Provide the full outputs for diagnostics
+      return {
+        valid: false,
+        error: 'No output to contract address or script datum found',
+        outputs: utxos.outputs,
+        explorerLink: getExplorerLink(txHash),
+      };
     }
 
     const amount = outputToContract.amount?.find((a) => a.unit === 'lovelace')?.quantity;
@@ -31,18 +48,37 @@ export const verifyDeposit = async (txHash, contractAddress, expectedAmount) => 
       return {
         valid: false,
         error: `Amount mismatch: expected ${expectedAmount}, got ${amount || 0}`,
+        amountFound: Number(amount) || 0,
+        outputs: utxos.outputs,
+        explorerLink: getExplorerLink(txHash),
       };
     }
 
     return {
       valid: true,
       amount: Number(amount),
+      matchedAddress: outputToContract.address || null,
+      hasInlineDatum: !!outputToContract.inline_datum || !!outputToContract.data_hash,
       blockTime: tx.block_time,
       blockHeight: tx.block_height,
       explorerLink: getExplorerLink(txHash),
     };
   } catch (error) {
-    return { valid: false, error: error.message };
+    // If Blockfrost returned a not-found diagnostic (404), consider the
+    // transaction as PENDING (recently submitted, not yet indexed) so the
+    // caller can accept it and retry verification later.
+    const msg = String(error.message || '').toLowerCase();
+    if (msg.includes('not found') || msg.includes('404')) {
+      return {
+        valid: false,
+        error: 'Transaction not found',
+        status: 'PENDING',
+        explorerLink: getExplorerLink(txHash),
+      };
+    }
+
+    // Surface other errors normally
+    return { valid: false, error: error.message, explorerLink: getExplorerLink(txHash) };
   }
 };
 

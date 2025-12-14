@@ -6,7 +6,14 @@ import User from '../models/User.js';
 export const submitProposal = async (req, res, next) => {
   try {
     const { jobId } = req.params;
-    const { coverLetter, bidAmount, timeline, attachments, portfolioLinks } = req.body;
+    const {
+      coverLetter,
+      bidAmount,
+      timeline,
+      attachments,
+      portfolioLinks,
+      preferredPaymentAddress,
+    } = req.body;
 
     if (!coverLetter || !bidAmount) {
       return res.status(400).json({ message: 'Cover letter and bid amount required' });
@@ -41,6 +48,22 @@ export const submitProposal = async (req, res, next) => {
         .json({ message: 'You have already submitted a proposal for this job' });
     }
 
+    // If preferred payment address provided, ensure it belongs to this freelancer
+    if (preferredPaymentAddress) {
+      const freelancerUser = await User.findById(req.userId);
+      const owns =
+        (freelancerUser.wallets || []).some((w) => w.address === preferredPaymentAddress) ||
+        freelancerUser.walletAddress === preferredPaymentAddress;
+      if (!owns) {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Preferred payment address is not linked to your account. Please link it first.',
+          });
+      }
+    }
+
     const proposal = new Proposal({
       jobId,
       freelancerId: req.userId,
@@ -49,6 +72,7 @@ export const submitProposal = async (req, res, next) => {
       timeline,
       attachments: attachments || [],
       portfolioLinks: portfolioLinks || [],
+      preferredPaymentAddress: preferredPaymentAddress || null,
       status: 'pending',
     });
 
@@ -155,7 +179,8 @@ export const acceptProposal = async (req, res, next) => {
 
     const contractDatum = {
       client: client?.walletAddress || 'addr_test1...',
-      freelancer: freelancer?.walletAddress || 'addr_test1...',
+      // Prefer freelancer's selected payment address from proposal, fallback to stored walletAddress
+      freelancer: proposal.preferredPaymentAddress || freelancer?.walletAddress || 'addr_test1...',
       amount: proposal.bidAmount,
       milestones: milestones.map((m) => ({
         id: m.id || `milestone_${Date.now()}_${Math.random()}`,

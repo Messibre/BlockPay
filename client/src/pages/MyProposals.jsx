@@ -9,6 +9,7 @@ import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import Select from "../components/Select.jsx";
 import Breadcrumbs from "../components/Breadcrumbs.jsx";
 import api from "../services/api.js";
+import BackButton from "../components/BackButton.jsx";
 import styles from "./MyProposals.module.css";
 
 function MyProposalsContent() {
@@ -41,6 +42,7 @@ function MyProposalsContent() {
   return (
     <div className={styles.myProposals}>
       <div className={styles.container}>
+        <BackButton />
         <Breadcrumbs
           items={[
             { label: "Home", path: "/" },

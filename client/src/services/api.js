@@ -48,6 +48,8 @@ export default {
       .post("/auth/wallet/verify", { address, signature, message })
       .then((res) => res.data),
   getMe: () => api.get("/auth/me").then((res) => res.data),
+  getUsers: (filters = {}) =>
+    api.get("/auth/users", { params: filters }).then((res) => res.data),
 
   // Jobs
   getJobs: (filters = {}) =>
@@ -61,9 +63,14 @@ export default {
   getContract: (id) => api.get(`/contracts/${id}`).then((res) => res.data),
   getMyContracts: (status) =>
     api.get("/contracts", { params: { status } }).then((res) => res.data),
-  recordDeposit: (id, txHash, amount) =>
+  recordDeposit: (id, txHash, amount, signerAddress, signerSignature) =>
     api
-      .post(`/contracts/${id}/deposit`, { txHash, amount })
+      .post(`/contracts/${id}/deposit`, {
+        txHash,
+        amount,
+        signerAddress,
+        signerSignature,
+      })
       .then((res) => res.data),
   getDeposits: (id) =>
     api.get(`/contracts/${id}/deposits`).then((res) => res.data),
@@ -85,7 +92,9 @@ export default {
   // Contract actions
   approveMilestone: (contractId, milestoneId, txHash) =>
     api
-      .post(`/contracts/${contractId}/milestones/${milestoneId}/approve`, { txHash })
+      .post(`/contracts/${contractId}/milestones/${milestoneId}/approve`, {
+        txHash,
+      })
       .then((res) => res.data),
   submitMilestone: (contractId, milestoneId, data) =>
     api

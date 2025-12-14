@@ -9,6 +9,7 @@ router.post("/login", authController.login);
 router.post("/wallet/verify", authController.verifyWallet);
 router.get("/me", authenticate, authController.getMe);
 router.patch("/me", authenticate, authController.updateMe);
+router.get("/users", authenticate, authController.getUsers);
 
 export default router;
 

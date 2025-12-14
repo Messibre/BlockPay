@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
     },
     walletAddress: {
       type: String,
-      required: true,
+      required: false,
       index: true,
     },
     wallets: [

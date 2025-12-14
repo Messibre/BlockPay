@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import { ping as pingBlockfrost } from './services/blockfrost.js';
 
 import app from './app.js';
 
@@ -12,6 +13,8 @@ async function start() {
   try {
     await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
+    const bf = await pingBlockfrost().catch((e) => ({ ok: false, error: e.message }));
+    console.log('Blockfrost status:', bf);
     app.listen(PORT, () => {
       console.log(`API listening on http://localhost:${PORT}`);
     });

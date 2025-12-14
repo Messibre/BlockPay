@@ -35,6 +35,8 @@ const paymentSchema = new mongoose.Schema(
     explorerLink: String,
     fromAddress: String,
     toAddress: String,
+    signerAddress: String, // the address that signed/submitted the tx
+    signerSignature: String,
     feeAmount: Number,
     feeAddress: String,
   },

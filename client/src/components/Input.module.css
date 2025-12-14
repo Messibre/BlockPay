@@ -1,24 +1,43 @@
-.inputContainer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+.field {
+  margin-bottom: 1.5rem;
+  width: 100%;
 }
 
 .label {
+  display: block;
+  margin-bottom: 0.5rem;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 500;
 }
 
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .input {
-  background-color: var(--bg-secondary);
+  width: 100%;
+  padding: 0.8rem 1rem;
   border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 0.75rem 1rem;
+  background: var(--bg-surface);
   border-radius: var(--radius-md);
+  color: var(--text-primary);
   font-size: 1rem;
   transition: all 0.2s;
+}
+
+/* Adjust padding for password inputs to make room for toggle */
+.input[type="password"],
+.input[type="text"] {
+  padding-right: 2.5rem; /* Space for the eye icon */
+}
+
+/* When not password toggle, textarea resizing */
+.textarea {
+  min-height: 100px;
+  resize: vertical;
 }
 
 .input:focus {
@@ -27,15 +46,43 @@
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-.input::placeholder {
-  color: var(--text-tertiary);
-}
-
 .error {
   border-color: var(--error);
 }
 
+.error:focus {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
 .errorMessage {
+  display: block;
   color: var(--error);
   font-size: 0.85rem;
+  margin-top: 0.3rem;
+}
+
+.togglePassword {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.togglePassword:hover {
+  color: var(--text-primary);
+}
+
+.togglePassword:focus {
+  outline: none;
+  color: var(--accent-primary);
 }

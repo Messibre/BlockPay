@@ -9,6 +9,7 @@ import Modal from "../components/Modal.jsx";
 import Input from "../components/Input.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import Breadcrumbs from "../components/Breadcrumbs.jsx";
+import BackButton from "../components/BackButton.jsx";
 import api from "../services/api.js";
 import styles from "./ManageJob.module.css";
 
@@ -171,6 +172,12 @@ export default function ManageJob() {
                       <p className={styles.proposalBid}>
                         Bid: <strong>{proposal.bidAmount / 1000000} ADA</strong>
                       </p>
+                      {proposal.preferredPaymentAddress && (
+                        <p className={styles.proposalPayment}>
+                          <strong>Preferred payout:</strong>{" "}
+                          {proposal.preferredPaymentAddress}
+                        </p>
+                      )}
                       {proposal.timeline && (
                         <p className={styles.proposalTimeline}>
                           Timeline: {proposal.timeline}

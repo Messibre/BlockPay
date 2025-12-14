@@ -15,6 +15,8 @@ import MyContracts from "./pages/MyContracts.jsx";
 import MyProposals from "./pages/MyProposals.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
+import Freelancers from "./pages/Freelancers.jsx";
+import Payments from "./pages/Payments.jsx";
 // import "./styles.css"; // Deprecated
 
 function App() {
@@ -47,6 +49,22 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/client" element={<ClientDashboard />} />
         <Route path="/dashboard/freelancer" element={<FreelancerDashboard />} />
+        <Route 
+          path="/freelancers" 
+          element={
+            <ProtectedRoute requiredRole="client">
+              <Freelancers />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/payments" 
+          element={
+            <ProtectedRoute requiredRole="client">
+              <Payments />
+            </ProtectedRoute>
+          } 
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>

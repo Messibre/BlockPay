@@ -16,4 +16,6 @@ Local development:
 Notes:
 
 - Vercel serverless functions will re-use connections between requests where possible. The wrapper caches the MongoDB connection to avoid re-connecting each invocation.
+- The `POST /contracts/:id/deposit` endpoint accepts `amount` in either ADA (e.g. `300`) or lovelace (e.g. `300000000`). The backend will detect the unit and convert to lovelace for on-chain verification.
+- Make sure `BLOCKFROST_KEY` is set and valid for the chosen network. If using preprod/testnet transactions, ensure `NETWORK` is not set to `mainnet` (default is preprod). Use the health endpoint (`GET /api/v1/health`) to check Blockfrost connectivity and permissions.
 - If you need health check routes, use `/api/v1/health`.

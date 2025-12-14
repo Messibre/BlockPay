@@ -32,7 +32,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.3",
     "morgan": "^1.10.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@emurgo/cardano-message-signing-nodejs": "^1.1.0"
   },
   "devDependencies": {
     "eslint": "^8.57.0",

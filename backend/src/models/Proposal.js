@@ -27,6 +27,7 @@ const proposalSchema = new mongoose.Schema(
     },
     attachments: [String], // URLs
     portfolioLinks: [String],
+    preferredPaymentAddress: String,
     status: {
       type: String,
       enum: ['pending', 'accepted', 'rejected', 'withdrawn'],
