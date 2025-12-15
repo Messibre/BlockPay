@@ -4,6 +4,7 @@ import { useWallet } from "@meshsdk/react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useToast } from "../contexts/ToastContext.jsx";
 import Footer from "./Footer.jsx";
+import UpcomingFeatures from "./UpcomingFeatures.jsx";
 import styles from "./Layout.module.css";
 
 export default function Layout({ children }) {
@@ -57,13 +58,13 @@ export default function Layout({ children }) {
     if (installedWallets.length === 0) {
       alert(
         "Please install a Cardano wallet extension:\n\n" +
-          "• Nami Wallet\n" +
-          "• Eternl Wallet\n" +
-          "• Lace Wallet\n" +
-          "• Flint Wallet\n" +
-          "• Gero Wallet\n" +
-          "• Typhon Wallet\n\n" +
-          "After installing, refresh the page and try again."
+        "• Nami Wallet\n" +
+        "• Eternl Wallet\n" +
+        "• Lace Wallet\n" +
+        "• Flint Wallet\n" +
+        "• Gero Wallet\n" +
+        "• Typhon Wallet\n\n" +
+        "After installing, refresh the page and try again."
       );
       return;
     }
@@ -76,15 +77,14 @@ export default function Layout({ children }) {
       setShowWalletModal(false);
       await connect(walletId);
       success(
-        `Successfully connected to ${
-          walletNames.find((w) => w.id === walletId)?.name || walletId
+        `Successfully connected to ${walletNames.find((w) => w.id === walletId)?.name || walletId
         }`
       );
     } catch (error) {
       console.error("Wallet connection error:", error);
       showError(
         `Failed to connect to wallet: ${error.message || "Unknown error"}\n\n` +
-          "Please ensure your wallet extension is unlocked."
+        "Please ensure your wallet extension is unlocked."
       );
     }
   };
@@ -116,7 +116,7 @@ export default function Layout({ children }) {
             {/* Desktop Nav */}
             <div className={styles.navLinks}>
               <Link to="/jobs">Jobs</Link>
-            {isAuthenticated ? (
+              {isAuthenticated ? (
                 <>
                   {user?.role === "client" && (
                     <Link to="/jobs/post">Post Job</Link>
@@ -144,11 +144,11 @@ export default function Layout({ children }) {
 
             <div className={styles.actions}>
               <button onClick={toggleTheme} className={styles.themeToggle} aria-label="Toggle theme">
-                  {theme === 'dark' ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                  ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                  )}
+                {theme === 'dark' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                )}
               </button>
 
               <div className={styles.desktopWallet}>
@@ -173,8 +173,8 @@ export default function Layout({ children }) {
               </div>
 
               {/* Mobile Menu Toggle */}
-              <button 
-                className={styles.menuToggle} 
+              <button
+                className={styles.menuToggle}
                 onClick={toggleMenu}
                 aria-label="Toggle menu"
               >
@@ -216,17 +216,17 @@ export default function Layout({ children }) {
                 <Link to="/register" onClick={() => setIsMenuOpen(false)}>Sign Up</Link>
               </>
             )}
-            
+
             <div className={styles.mobileWallet}>
-               {connected ? (
-                  <button onClick={handleDisconnect} className={styles.buttonSmall}>
-                    Disconnect ({name})
-                  </button>
-                ) : (
-                  <button onClick={() => { handleConnectClick(); setIsMenuOpen(false); }} className={styles.buttonSmall}>
-                    Connect Wallet
-                  </button>
-                )}
+              {connected ? (
+                <button onClick={handleDisconnect} className={styles.buttonSmall}>
+                  Disconnect ({name})
+                </button>
+              ) : (
+                <button onClick={() => { handleConnectClick(); setIsMenuOpen(false); }} className={styles.buttonSmall}>
+                  Connect Wallet
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -269,6 +269,7 @@ export default function Layout({ children }) {
         </div>
       )}
       <main className={styles.main}>{children}</main>
+      <UpcomingFeatures />
       <Footer />
     </div>
   );

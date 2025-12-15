@@ -4,6 +4,7 @@ import {
   resolvePlutusScriptAddress,
   resolveDataHash,
   BlockfrostProvider,
+  serializeData,
 } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 
@@ -21,54 +22,62 @@ export const adaToLovelace = (ada) => {
 export const createRedeemerData = {
   // Aiken: Deposit -> Constr 0 []
   deposit: () => {
-    return {
+    return serializeData({
       alternative: 0,
       fields: []
-    };
+    });
   },
-  
+
   // Aiken: Release(ByteArray) -> Constr 1 [ByteArray milestoneId]
   release: (milestoneId) => {
     const milestoneIdStr = typeof milestoneId !== "string" ? String(milestoneId) : milestoneId;
     const encoder = new TextEncoder();
     const bytes = encoder.encode(milestoneIdStr);
-    
-    return {
+
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    return serializeData({
       alternative: 1,
       fields: [
         {
           alternative: 0,
-          fields: [Array.from(bytes)]
+          fields: [hex]
         }
       ]
-    };
+    });
   },
-  
+
   // Aiken: Withdraw(ByteArray) -> Constr 2 [ByteArray milestoneId]
   withdraw: (milestoneId) => {
     const milestoneIdStr = typeof milestoneId !== "string" ? String(milestoneId) : milestoneId;
     const encoder = new TextEncoder();
     const bytes = encoder.encode(milestoneIdStr);
-    
-    return {
+
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    return serializeData({
       alternative: 2,
       fields: [
         {
           alternative: 0,
-          fields: [Array.from(bytes)]
+          fields: [hex]
         }
       ]
-    };
+    });
   },
-  
+
   // Aiken: Refund -> Constr 3 []
   refund: () => {
-    return {
+    return serializeData({
       alternative: 3,
       fields: []
-    };
+    });
   },
-  
+
   // Aiken: Arbitrate(ArbitrateDecision) -> Constr 4 [ArbitrateDecision]
   arbitrate: (decision) => {
     const decisionMap = {
@@ -78,8 +87,8 @@ export const createRedeemerData = {
       'RefundPartial': 3
     };
     const decisionIndex = typeof decision === 'string' ? decisionMap[decision] : decision;
-    
-    return {
+
+    return serializeData({
       alternative: 4,
       fields: [
         {
@@ -87,7 +96,7 @@ export const createRedeemerData = {
           fields: []
         }
       ]
-    };
+    });
   }
 };
 
@@ -244,7 +253,7 @@ export const buildReleaseTransaction = async (
     typeof s === "string" &&
     /^(addr1|addr_test1)[0-9a-z]+$/.test(s) &&
     s.length >= 8;
-  
+
   if (!isBech32(oldDatum.client)) {
     throw new Error(
       `Invalid client address in datum: "${oldDatum.client}". Expected a valid Bech32 address`
@@ -258,10 +267,10 @@ export const buildReleaseTransaction = async (
   // Setup spending transaction with proper script reference
   txBuilder.spendingPlutusScriptV3();
   txBuilder.txIn(utxo.txHash, utxo.outputIndex);
-  
+
   // Use the script from constants with proper structure
-  const script = { code: contractScript.cbor, version: "V3" };
-  txBuilder.txInScript(script);
+  // Use the script from constants
+  txBuilder.txInScript(contractScript.cbor);
   txBuilder.txInRedeemerValue(redeemerData); // ✅ NOW WORKS - proper data structure
   txBuilder.txInInlineDatumPresent();
 
