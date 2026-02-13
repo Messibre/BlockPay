@@ -17,8 +17,7 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Freelancers from "./pages/Freelancers.jsx";
 import Payments from "./pages/Payments.jsx";
-import DepositTrial from "./pages/DepositTrial.jsx";
-// import "./styles.css"; // Deprecated
+import "./styles.css";
 
 function App() {
   return (
@@ -50,23 +49,22 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/client" element={<ClientDashboard />} />
         <Route path="/dashboard/freelancer" element={<FreelancerDashboard />} />
-        <Route 
-          path="/freelancers" 
+        <Route
+          path="/freelancers"
           element={
             <ProtectedRoute requiredRole="client">
               <Freelancers />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/payments" 
+        <Route
+          path="/payments"
           element={
             <ProtectedRoute requiredRole="client">
               <Payments />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route path="/deposit-trial" element={<DepositTrial />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>
