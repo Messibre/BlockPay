@@ -1,4 +1,4 @@
-# Cardano Freelance Escrow
+#BlockPay Cardano Freelance Escrow
 
 Secure, transparent freelance payments on Cardano (preprod) with an escrow smart contract (Aiken), Mesh-powered React frontend, and Express/JavaScript backend. Designed to run on low-spec machines (no Tailwind, minimal deps).
 
@@ -59,13 +59,13 @@ See [docs/SETUP.md](docs/SETUP.md) for detailed installation instructions.
 This repository is optimized for Vercel. We recommend creating two separate projects:
 
 1.  **Frontend (`client` folder)**
-    -   Root Directory: `client`
-    -   Framework: Vite
-    -   Build Command: `npm run build`
-    -   Output: `dist`
-    -   Env Vars: `VITE_BACKEND_URL` (point to your backend deployment).
+    - Root Directory: `client`
+    - Framework: Vite
+    - Build Command: `npm run build`
+    - Output: `dist`
+    - Env Vars: `VITE_BACKEND_URL` (point to your backend deployment).
 
 2.  **Backend (`backend` folder)**
-    -   Root Directory: `backend`
-    -   Env Vars: `MONGO_URI`, `JWT_SECRET`, `BLOCKFROST_KEY`, `NETWORK` (preprod), `ESCROW_SCRIPT_ADDRESS`.
-    -   *Note: Includes a serverless wrapper at `api/catchall.js`.*
+    - Root Directory: `backend`
+    - Env Vars: `MONGO_URI`, `JWT_SECRET`, `BLOCKFROST_KEY`, `NETWORK` (preprod), `ESCROW_SCRIPT_ADDRESS`.
+    - _Note: Includes a serverless wrapper at `api/catchall.js`._

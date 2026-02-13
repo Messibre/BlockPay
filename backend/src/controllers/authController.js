@@ -77,7 +77,7 @@ export const register = [
     } catch (error) {
       next(error);
     }
-  }
+  },
 ];
 
 export const login = [
@@ -116,7 +116,7 @@ export const login = [
     } catch (error) {
       next(error);
     }
-  }
+  },
 ];
 
 export const verifyWallet = [
@@ -214,7 +214,7 @@ export const verifyWallet = [
     } catch (error) {
       next(error);
     }
-  }
+  },
 ];
 
 export const getMe = async (req, res, next) => {
@@ -233,8 +233,8 @@ export const updateMe = [
   validateRequest({
     body: {
       displayName: { type: 'string', minLength: 2, maxLength: 100 },
-      email: { type: 'string', pattern: 'email', maxLength: 255 }
-    }
+      email: { type: 'string', pattern: 'email', maxLength: 255 },
+    },
   }),
   async (req, res, next) => {
     try {
@@ -257,7 +257,7 @@ export const updateMe = [
     } catch (error) {
       next(error);
     }
-  }
+  },
 ];
 
 export const getUsers = async (req, res, next) => {
@@ -296,8 +296,8 @@ export const getUsers = async (req, res, next) => {
         page: pageNum,
         limit: limitNum,
         total,
-        pages: Math.ceil(total / limitNum)
-      }
+        pages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
     next(error);

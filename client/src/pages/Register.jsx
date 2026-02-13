@@ -35,9 +35,15 @@ export default function Register() {
       success("Registration successful! Welcome!");
       navigate("/");
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Registration failed";
+      const resp = err.response?.data;
+      // Prefer detailed validation errors when present
+      const details = resp?.details ? resp.details.join("; ") : null;
+      const errorMsg = details || resp?.message || "Registration failed";
       setError(errorMsg);
       showError(errorMsg);
+      // Also log full response for debugging
+      // eslint-disable-next-line no-console
+      console.error("Register error response:", resp || err);
     }
   };
 

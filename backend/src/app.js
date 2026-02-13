@@ -16,7 +16,7 @@ dotenv.config();
 
 // Environment validation
 const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI'];
-const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
 
 if (missingVars.length > 0) {
   console.error('Missing required environment variables:', missingVars);
@@ -30,7 +30,7 @@ app.use(securityHeaders);
 app.use(sanitizeInput);
 
 // Rate limiting - apply to all API routes
-app.use('/api/v1', rateLimiter(15 * 60 * 1000, 100)); // 100 requests per 15 minutes
+app.use('/api/v1', rateLimiter(15 * 60 * 1000, 200)); // 100 requests per 15 minutes
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
@@ -78,26 +78,31 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", "https:", "wss:"],
-        fontSrc: ["'self'", "https:"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", 'https:', 'wss:'],
+        fontSrc: ["'self'", 'https:'],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         frameSrc: ["'none'"],
       },
     },
-    hsts: process.env.NODE_ENV === 'production' ? {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true
-    } : false,
+    hsts:
+      process.env.NODE_ENV === 'production'
+        ? {
+            maxAge: 31536000,
+            includeSubDomains: true,
+            preload: true,
+          }
+        : false,
   }),
 );
 
 // Logging with security considerations
-app.use(morgan('combined', {
-  skip: (req, res) => req.url === '/health' || req.url.startsWith('/api/v1/health')
-}));
+app.use(
+  morgan('combined', {
+    skip: (req, res) => req.url === '/health' || req.url.startsWith('/api/v1/health'),
+  }),
+);
 
 // Health check endpoint (before rate limiting for monitoring)
 app.get('/api/v1/health', async (_req, res) => {
@@ -111,13 +116,13 @@ app.get('/api/v1/health', async (_req, res) => {
       database: dbStatus,
       blockfrost: bf,
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
     });
   } catch (error) {
-    res.status(500).json({ 
-      status: 'error', 
+    res.status(500).json({
+      status: 'error',
       message: 'Health check failed',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -133,7 +138,7 @@ app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Not Found',
     message: 'The requested resource was not found',
-    path: req.originalUrl
+    path: req.originalUrl,
   });
 });
 

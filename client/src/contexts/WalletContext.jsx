@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useWallet, useAddress } from "@meshsdk/react";
 
@@ -11,7 +10,6 @@ export const WalletProvider = ({ children }) => {
 
   useEffect(() => {
     if (connected && wallet) {
-      // You can store wallet name if Mesh exposes it easily or just persist connection
       // Mesh handles persistence mostly
     }
   }, [connected, wallet]);

@@ -19,6 +19,7 @@ import {
   lovelaceToAda,
   findMatchingUtxo,
 } from "../utils/transactions.js";
+import { BlockfrostProvider } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 import styles from "./ContractDetail.module.css";
 
@@ -91,24 +92,18 @@ export default function ContractDetail() {
   // 1. Contract object itself (if saved)
   // 2. Constants/Env variable
   // 3. Derived from CBOR (Fallback)
-  let scriptAddress = null;
 
-  if (isValidAddress(contract?.contractAddress)) {
-    scriptAddress = contract.contractAddress;
-  } else if (
-    contractScript?.address ||
-    import.meta?.env?.VITE_ESCROW_SCRIPT_ADDRESS
-  ) {
+  let scriptAddress = null;
+  try {
+    const scriptObject = { code: contractScript.cbor, version: "V3" };
+    scriptAddress = resolvePlutusScriptAddress(scriptObject, 0);
+    console.log("🎯 UI forced to use current CBOR address:", scriptAddress);
+  } catch (e) {
+    console.error("❌ Failed to derive script address from CBOR:", e);
+    // Optional: keep your old fallback here just in case,
+    // but if the CBOR is valid, this is the only one that matters.
     scriptAddress =
       contractScript.address || import.meta.env.VITE_ESCROW_SCRIPT_ADDRESS;
-  } else if (contractScript?.cbor) {
-    try {
-      // Fallback: Derived from CBOR (Testnet = 0)
-      scriptAddress = resolvePlutusScriptAddress(contractScript.cbor, 0);
-      console.log("Derived script address from CBOR:", scriptAddress);
-    } catch (e) {
-      console.error("Failed to derive script address:", e);
-    }
   }
 
   // Debug logs to help diagnose empty page issues
@@ -158,12 +153,12 @@ export default function ContractDetail() {
       const clientAddr = isBech32(contract.datum?.client)
         ? contract.datum.client
         : isBech32(address)
-        ? address
-        : null;
+          ? address
+          : null;
 
       if (!clientAddr) {
         showError(
-          "Invalid client address on contract. Connect wallet or fix contract data."
+          "Invalid client address on contract. Connect wallet or fix contract data.",
         );
         setIsDepositing(false);
         return;
@@ -172,12 +167,12 @@ export default function ContractDetail() {
       const freelancerAddr = isBech32(contract.datum?.freelancer)
         ? contract.datum.freelancer
         : isBech32(contract.freelancerId?.walletAddress)
-        ? contract.freelancerId.walletAddress
-        : null;
+          ? contract.freelancerId.walletAddress
+          : null;
 
       if (!freelancerAddr) {
         showError(
-          "Invalid freelancer address on contract. Please check freelancer settings."
+          "Invalid freelancer address on contract. Please check freelancer settings.",
         );
         setIsDepositing(false);
         return;
@@ -186,14 +181,14 @@ export default function ContractDetail() {
       const feeAddr = isBech32(contract.datum?.feeAddress)
         ? contract.datum?.feeAddress
         : isBech32(address)
-        ? address
-        : null;
+          ? address
+          : null;
 
       const arbitratorAddr = isBech32(contract.datum?.arbitrator)
         ? contract.datum?.arbitrator
         : isBech32(address)
-        ? address
-        : null;
+          ? address
+          : null;
 
       // Build the escrow datum
       const datum = {
@@ -219,7 +214,7 @@ export default function ContractDetail() {
         wallet,
         scriptAddress,
         contract.totalAmount,
-        datum
+        datum,
       );
 
       // Record deposit with backend (include signer info if present)
@@ -228,7 +223,7 @@ export default function ContractDetail() {
         txHash,
         contract.totalAmount,
         signerAddr,
-        signerSignature
+        signerSignature,
       );
 
       success(`Deposit transaction submitted! TX: ${txHash.slice(0, 16)}...`);
@@ -261,7 +256,7 @@ export default function ContractDetail() {
 
     // Otherwise prompt user to switch in their extension
     showError(
-      'Please switch the active account in your wallet extension, then click "I switched"'
+      'Please switch the active account in your wallet extension, then click "I switched"',
     );
   };
 
@@ -296,7 +291,9 @@ export default function ContractDetail() {
     } catch (e) {
       console.error("Sign & link failed", e);
       showError(
-        e.response?.data?.message || e.message || "Failed to sign & link wallet"
+        e.response?.data?.message ||
+          e.message ||
+          "Failed to sign & link wallet",
       );
     } finally {
       setIsLinking(false);
@@ -323,6 +320,16 @@ export default function ContractDetail() {
       if (!utxos || utxos.length === 0) {
         throw new Error("No UTxOs found in contract script");
       }
+
+      // Prefer UTxO that matches the most recent confirmed deposit txHash
+      const deposits = contract?.deposits || [];
+      const confirmedDeposits = deposits.filter(
+        (d) => d.status === "CONFIRMED",
+      );
+      const latestDeposit = confirmedDeposits[0] || deposits[0] || null;
+      const preferredUtxo = latestDeposit
+        ? utxos.find((u) => u.txHash === latestDeposit.txHash)
+        : null;
       // Basic address validator
       const isBech32 = (s) =>
         typeof s === "string" &&
@@ -333,16 +340,16 @@ export default function ContractDetail() {
       const clientAddr = isBech32(contract.datum?.client)
         ? contract.datum.client
         : isBech32(address)
-        ? address
-        : null;
+          ? address
+          : null;
 
       if (!clientAddr) throw new Error("Invalid client address on contract");
 
       const freelancerAddr = isBech32(contract.datum?.freelancer)
         ? contract.datum.freelancer
         : isBech32(contract.freelancerId?.walletAddress)
-        ? contract.freelancerId.walletAddress
-        : null;
+          ? contract.freelancerId.walletAddress
+          : null;
 
       if (!freelancerAddr)
         throw new Error("Invalid freelancer address on contract");
@@ -378,14 +385,56 @@ export default function ContractDetail() {
         throw new Error(`Invalid client address: ${currentDatum.client}`);
       }
       if (!isBech32(currentDatum.freelancer)) {
-        throw new Error(`Invalid freelancer address: ${currentDatum.freelancer}`);
+        throw new Error(
+          `Invalid freelancer address: ${currentDatum.freelancer}`,
+        );
       }
 
       // 4. Find relevant UTxO
-      const utxo = findMatchingUtxo(utxos, currentDatum);
-      if (!utxo) {
+      // 1. Initialize the provider (if not already done)
+      const blockfrostProvider = new BlockfrostProvider(
+        import.meta.env.VITE_BLOCKFROST_KEY,
+      );
+
+      // 2. Fetch directly using the fetcher interface
+      // In Mesh, the provider is also the fetcher.
+      // Use .fetchAddressUtxos (plural) or .fetchUtxos based on your MeshTxBuilder setup
+      let onChainUtxos = [];
+      try {
+        // Try the most common Mesh fetcher method
+        onChainUtxos =
+          await blockfrostProvider.fetchAddressUTxOs(scriptAddress);
+      } catch (e) {
+        // Fallback for different Mesh versions
+        onChainUtxos = await blockfrostProvider.fetchUtxos(scriptAddress);
+      }
+
+      console.log("On-chain UTXOs found:", onChainUtxos);
+
+      if (!onChainUtxos || onChainUtxos.length === 0) {
+        throw new Error(
+          `No funds found at: ${scriptAddress}. You must deposit to THIS address first.`,
+        );
+      }
+
+      // 3. Use the first UTXO
+      const rawUtxo = onChainUtxos[0];
+
+      // ... Now your existing 'formattedUtxo' logic below this will work!
+      if (!rawUtxo) {
         throw new Error("Contract UTxO not found. Has it been deposited?");
       }
+
+      const formattedUtxo = {
+        input: {
+          txHash: rawUtxo.txHash || rawUtxo.input?.txHash,
+          outputIndex: rawUtxo.outputIndex ?? rawUtxo.input?.outputIndex,
+        },
+        output: {
+          address: scriptAddress,
+          amount: rawUtxo.amount || rawUtxo.output?.amount,
+        },
+      };
 
       const milestoneAmount = milestone.amount;
       const feePercent = contract.datum?.feePercent || 100;
@@ -397,7 +446,7 @@ export default function ContractDetail() {
       const newDatum = {
         ...currentDatum,
         milestones: currentDatum.milestones.map((m) =>
-          m.id === milestoneId ? { ...m, paid: true } : m
+          m.id === milestoneId ? { ...m, paid: true } : m,
         ),
       };
 
@@ -416,9 +465,9 @@ export default function ContractDetail() {
         payoutAmount,
         contract.freelancerId.walletAddress,
         remainingAmount,
-        utxo,
+        formattedUtxo,
         feeAddress,
-        feeAmount
+        feeAmount,
       );
 
       // 7. Record release with backend
@@ -428,7 +477,18 @@ export default function ContractDetail() {
       queryClient.invalidateQueries(["contract", id]);
     } catch (error) {
       console.error("Approve error:", error);
-      showError(error.message || "Failed to approve milestone");
+      // Prefer backend-provided message/details for clarity
+      const resp = error.response?.data;
+      const details = resp?.details ? resp.details.join("; ") : null;
+      const msg =
+        details ||
+        resp?.message ||
+        error.message ||
+        "Failed to approve milestone";
+      showError(msg);
+      // Log full response for debugging
+      // eslint-disable-next-line no-console
+      console.error("Approve error response:", resp || error);
     } finally {
       setIsApproving({ ...isApproving, [milestoneId]: false });
     }

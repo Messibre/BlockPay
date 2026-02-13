@@ -42,7 +42,7 @@ const rateLimiter = (windowMs = 15 * 60 * 1000, max = 100) => {
 };
 
 // Stricter rate limiting for authentication endpoints
-const authRateLimiter = rateLimiter(15 * 60 * 1000, 5); // 5 attempts per 15 minutes
+const authRateLimiter = rateLimiter(15 * 60 * 1000, 20); // 20 attempts per 15 minutes
 
 // Very strict rate limiting for sensitive operations
 const strictRateLimiter = rateLimiter(15 * 60 * 1000, 3); // 3 attempts per 15 minutes

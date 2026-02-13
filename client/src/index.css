@@ -1,25 +1,69 @@
+@import "tailwindcss";
+
+/* Base Styles */
+html {
+  font-size: 14px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 :root {
   /* HSL Color System for easier theming */
   /* Indigo Primary */
   --primary-h: 239;
   --primary-s: 84%;
   --primary-l: 67%;
-  --color-primary: hsl(var(--primary-h), var(--primary-s), var(--primary-l));
+  /*  */
+  --color-primary: rgb(96, 243, 96);
   --color-primary-hover: hsl(var(--primary-h), var(--primary-s), 60%);
-  --color-primary-glow: hsla(var(--primary-h), var(--primary-s), var(--primary-l), 0.5);
+  --color-primary-glow: hsla(
+    var(--primary-h),
+    var(--primary-s),
+    var(--primary-l),
+    0.5
+  );
 
   /* Pink/Fuchsia Secondary */
   --secondary-h: 322;
   --secondary-s: 81%;
   --secondary-l: 60%;
-  --color-secondary: hsl(var(--secondary-h), var(--secondary-s), var(--secondary-l));
+  --color-secondary: yellow;
+  /*  hsl(
+    var(--secondary-h),
+    var(--secondary-s),
+    var(--secondary-l)
+  ) */
   --color-secondary-hover: hsl(var(--secondary-h), var(--secondary-s), 50%);
 
   /* Backgrounds (Dark Default) */
   --bg-primary: #0b1120; /* Deepest blue-black */
   --bg-secondary: #161f32; /* Slightly lighter for cards */
   --bg-tertiary: #1e293b; /* Borders/Accents */
-  --bg-gradient: radial-gradient(circle at top center, #1e293b 0%, #0b1120 100%);
+  --bg-gradient: radial-gradient(
+    circle at top center,
+    #1e293b 0%,
+    #0b1120 100%
+  );
 
   /* Text */
   --text-primary: #f8fafc;
@@ -46,20 +90,24 @@
   --radius-2xl: 1.5rem;
 
   /* Typography */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-display: 'Outfit', 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Outfit", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 
   /* Spacing */
   --nav-height: 72px;
   --section-spacing: 4rem;
 }
 
-[data-theme='light'] {
+[data-theme="light"] {
   --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
   --bg-tertiary: #e2e8f0;
-  --bg-gradient: radial-gradient(circle at top center, #f1f5f9 0%, #f8fafc 100%);
+  --bg-gradient: radial-gradient(
+    circle at top center,
+    #f1f5f9 0%,
+    #f8fafc 100%
+  );
 
   --text-primary: #0f172a;
   --text-secondary: #475569;
@@ -92,7 +140,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 #root {
@@ -117,7 +167,12 @@ button {
   cursor: pointer;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-display);
   color: var(--text-primary);
   font-weight: 700;
@@ -133,7 +188,11 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-secondary) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -168,7 +227,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Form Elements */
-input, select, textarea {
+input,
+select,
+textarea {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -176,10 +237,14 @@ input, select, textarea {
   border-radius: var(--radius-md);
   font-size: 1rem;
   width: 100%;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-glow);
@@ -206,4 +271,3 @@ input:focus, select:focus, textarea:focus {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
 }
-

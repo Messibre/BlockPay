@@ -17,6 +17,7 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Freelancers from "./pages/Freelancers.jsx";
 import Payments from "./pages/Payments.jsx";
+import DepositTrial from "./pages/DepositTrial.jsx";
 // import "./styles.css"; // Deprecated
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        <Route path="/deposit-trial" element={<DepositTrial />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Routes>

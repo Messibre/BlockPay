@@ -1,17 +1,18 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const disputeSchema = new mongoose.Schema(
   {
     contractId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Contract",
+      ref: 'Contract',
       required: true,
       index: true,
     },
+
     milestoneId: String,
     raisedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     reason: {
@@ -21,14 +22,14 @@ const disputeSchema = new mongoose.Schema(
     evidence: [String], // URLs/files
     status: {
       type: String,
-      enum: ["open", "reviewing", "resolved"],
-      default: "open",
+      enum: ['open', 'reviewing', 'resolved'],
+      default: 'open',
       index: true,
     },
     resolution: {
       decision: {
         type: String,
-        enum: ["refund", "pay_partial", "pay_full"],
+        enum: ['refund', 'pay_partial', 'pay_full'],
       },
       distribution: [
         {
@@ -49,5 +50,4 @@ const disputeSchema = new mongoose.Schema(
 disputeSchema.index({ contractId: 1, status: 1 });
 disputeSchema.index({ status: 1 });
 
-export default mongoose.model("Dispute", disputeSchema);
-
+export default mongoose.model('Dispute', disputeSchema);
