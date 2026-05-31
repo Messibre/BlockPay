@@ -1,12 +1,16 @@
+/* Toast Notifications - Professional Design */
+
 .toast {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: slideIn 0.3s ease-out;
-  min-width: 300px;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  animation: slideIn var(--transition-slow) cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 320px;
+  max-width: 440px;
+  backdrop-filter: blur(8px);
 }
 
 @keyframes slideIn {
@@ -28,55 +32,80 @@
 }
 
 .icon {
-  font-size: 1.2rem;
-  font-weight: bold;
+  font-size: 1.125rem;
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .message {
   flex: 1;
-  font-size: 0.95rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .close {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   cursor: pointer;
   color: inherit;
-  opacity: 0.7;
-  padding: 0;
-  width: 24px;
-  height: 24px;
+  opacity: 0.6;
+  padding: 0.25rem;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  margin-left: 0.5rem;
 }
 
 .close:hover {
   opacity: 1;
+  background: rgba(0, 0, 0, 0.1);
 }
 
+/* Variants */
 .success {
-  background-color: #d4edda;
-  color: #155724;
-  border-left: 4px solid #28a745;
+  background-color: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border-left: 4px solid #dc3545;
+  background-color: var(--error-bg);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .warning {
-  background-color: #fff3cd;
-  color: #856404;
-  border-left: 4px solid #ffc107;
+  background-color: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .info {
-  background-color: #d1ecf1;
-  color: #0c5460;
-  border-left: 4px solid #17a2b8;
+  background-color: var(--info-bg);
+  color: var(--info);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* Light theme adjustments */
+[data-theme="light"] .success {
+  background-color: #ecfdf5;
+}
+
+[data-theme="light"] .error {
+  background-color: #fef2f2;
+}
+
+[data-theme="light"] .warning {
+  background-color: #fffbeb;
+}
+
+[data-theme="light"] .info {
+  background-color: #eff6ff;
 }

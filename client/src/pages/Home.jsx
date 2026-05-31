@@ -121,10 +121,9 @@ export default function Home() {
         {/* CTA SECTION */}
         {!isAuthenticated && (
           <section className={styles.cta}>
-            <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center' }}>
+            <div className={styles.ctaCard}>
               <h2>Ready to start?</h2>
               <p>Join thousands of freelancers and clients building on Cardano.</p>
-              <br />
               <Link to="/register">
                 <Button size="large">Create Account</Button>
               </Link>
