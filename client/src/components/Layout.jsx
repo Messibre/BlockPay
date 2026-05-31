@@ -110,7 +110,8 @@ export default function Layout({ children }) {
       <header className={styles.header}>
         <div className={styles.container}>
           <Link to="/" className={styles.logo}>
-            <h1>BlockPay</h1>
+            <img src="/logo.png" alt="" className={styles.logoIcon} />
+            <span>BlockPay</span>
           </Link>
           <nav className={styles.nav}>
             {/* Desktop Nav */}

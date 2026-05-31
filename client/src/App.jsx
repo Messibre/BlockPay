@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Home from "./pages/Home.jsx";
 import Jobs from "./pages/Jobs.jsx";
@@ -17,58 +18,62 @@ import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Freelancers from "./pages/Freelancers.jsx";
 import Payments from "./pages/Payments.jsx";
+import NotFound from "./pages/NotFound.jsx";
 import "./styles.css";
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/jobs" element={<Jobs />} />
-        <Route
-          path="/jobs/post"
-          element={
-            <ProtectedRoute requiredRole="client">
-              <PostJob />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/jobs/:id" element={<JobDetail />} />
-        <Route path="/jobs/:id/apply" element={<SubmitProposal />} />
-        <Route
-          path="/jobs/:id/manage"
-          element={
-            <ProtectedRoute requiredRole="client">
-              <ManageJob />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/contracts" element={<MyContracts />} />
-        <Route path="/contracts/:id" element={<ContractDetail />} />
-        <Route path="/proposals" element={<MyProposals />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/dashboard/client" element={<ClientDashboard />} />
-        <Route path="/dashboard/freelancer" element={<FreelancerDashboard />} />
-        <Route
-          path="/freelancers"
-          element={
-            <ProtectedRoute requiredRole="client">
-              <Freelancers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/payments"
-          element={
-            <ProtectedRoute requiredRole="client">
-              <Payments />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/jobs" element={<Jobs />} />
+          <Route
+            path="/jobs/post"
+            element={
+              <ProtectedRoute requiredRole="client">
+                <PostJob />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/jobs/:id" element={<JobDetail />} />
+          <Route path="/jobs/:id/apply" element={<SubmitProposal />} />
+          <Route
+            path="/jobs/:id/manage"
+            element={
+              <ProtectedRoute requiredRole="client">
+                <ManageJob />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/contracts" element={<MyContracts />} />
+          <Route path="/contracts/:id" element={<ContractDetail />} />
+          <Route path="/proposals" element={<MyProposals />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard/client" element={<ClientDashboard />} />
+          <Route path="/dashboard/freelancer" element={<FreelancerDashboard />} />
+          <Route
+            path="/freelancers"
+            element={
+              <ProtectedRoute requiredRole="client">
+                <Freelancers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute requiredRole="client">
+                <Payments />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   );
 }
 
