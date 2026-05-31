@@ -23,7 +23,7 @@ export default function Jobs() {
     maxBudget: "",
   });
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["jobs", filters, page],
     queryFn: () => api.getJobs({ ...filters, page, limit: 12 }),
     refetchInterval: 30000,
@@ -138,7 +138,18 @@ export default function Jobs() {
               </div>
             ) : error ? (
               <div className={styles.error}>
-                <p>Failed to load jobs. Please check your connection.</p>
+                <div className={styles.errorIcon}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </div>
+                <h3>Unable to load jobs</h3>
+                <p>We could not connect to the server. Please check your internet connection and try again.</p>
+                <Button variant="primary" onClick={() => refetch()} className={styles.retryButton}>
+                  Try Again
+                </Button>
               </div>
             ) : (
               <>
