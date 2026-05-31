@@ -1,23 +1,26 @@
+/* Layout Component - Professional Navigation */
+
 .layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
 
+/* Header / Navigation Bar */
 .header {
   height: var(--nav-height);
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(11, 17, 32, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-color);
-  transition: all 0.3s ease;
+  transition: background var(--transition-base);
 }
 
 [data-theme="light"] .header {
-  background: hsla(0, 1%, 100%, 0.1);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .container {
@@ -25,108 +28,151 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 1280px;
+  max-width: var(--container-max);
   margin: 0 auto;
   padding: 0 1.5rem;
   height: 100%;
 }
 
-.logo h1 {
-  font-size: 1.5rem;
-  background: linear-gradient(
-    135deg,
-    var(--color-primary),
-    var(--color-secondary)
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin: 0;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
 }
 
+.logo h1 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo h1::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary);
+  border-radius: 2px;
+  box-shadow: 0 0 12px var(--color-primary-glow);
+}
+
+/* Navigation */
 .nav {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .navLinks {
   display: flex;
   align-items: center;
-  gap: 2.5rem;
+  gap: 0.25rem;
 }
 
-.navLinks a {
+.navLinks a,
+.navButton {
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.9375rem;
   font-weight: 500;
+  padding: 0.5rem 0.875rem;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
   position: relative;
-  transition: color 0.2s;
 }
 
 .navLinks a:hover,
+.navButton:hover,
 .navLinks a.active {
   color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
 .navButton {
   background: none;
   border: none;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  font-weight: 500;
-  padding: 0;
   cursor: pointer;
-  transition: color 0.2s;
   font-family: inherit;
 }
 
-.navButton:hover {
-  color: var(--text-primary);
-}
-
+/* Actions Area */
 .actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
+/* Theme Toggle */
+.themeToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.themeToggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-glow);
+}
+
+/* Desktop Wallet Section */
 .desktopWallet {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-left: 1rem;
+  gap: 0.75rem;
+  margin-left: 0.5rem;
   padding-left: 1rem;
   border-left: 1px solid var(--border-color);
 }
 
 .walletName {
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
   color: var(--text-primary);
   font-family: var(--font-mono);
   background: var(--bg-tertiary);
-  padding: 0.35rem 0.85rem;
-  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .buttonSmall {
-  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 500;
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  transition: all 0.2s;
+  background: var(--color-primary);
+  border: none;
+  color: var(--text-inverse);
+  transition: all var(--transition-fast);
+  cursor: pointer;
 }
 
 .buttonSmall:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: var(--color-primary-hover);
+  box-shadow: 0 0 16px var(--color-primary-glow);
 }
 
+/* Mobile Menu Toggle */
 .menuToggle {
   display: none;
   background: none;
@@ -134,83 +180,40 @@
   color: var(--text-primary);
   cursor: pointer;
   padding: 0.5rem;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
 }
 
-/* Mobile Menu - Sidebar */
+.menuToggle:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Mobile Menu - Slide-in Sidebar */
 .mobileMenu {
-  position: fixed !important;
-  top: var(--nav-height) !important;
-  left: -320px !important;
-  width: 300px !important;
-  height: calc(100vh - var(--nav-height)) !important;
-  background: var(--bg-secondary) !important;
-  border-right: 1px solid var(--border-color) !important;
-  z-index: 99 !important;
-  transform: translateX(0) !important;
-  transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  overscroll-behavior: contain !important;
-  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1) !important;
+  position: fixed;
+  top: var(--nav-height);
+  left: 0;
+  width: 300px;
+  height: calc(100vh - var(--nav-height));
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  z-index: 99;
+  transform: translateX(-100%);
+  transition: transform var(--transition-slow) cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .mobileMenu.open {
-  left: 0 !important;
-}
-
-.mobileNavLinks {
-  display: flex;
-  flex-direction: column;
-  padding: 2rem;
-  gap: 1.5rem;
-  height: 100%;
-  overflow-y: auto;
-}
-
-.mobileNavLinks a {
-  font-size: 1.25rem;
-  color: var(--text-primary);
-  font-weight: 600;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 1rem;
-  transition: color 0.2s;
-}
-
-.mobileNavLinks a:hover {
-  color: var(--color-primary);
-}
-
-.mobileUser,
-.mobileWallet {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.mobileUser span {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.buttonSecondary {
-  font-size: 0.9rem;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  transition: all 0.2s;
-}
-
-.buttonSecondary:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  transform: translateX(0);
+  box-shadow: var(--shadow-xl);
 }
 
 /* Mobile Menu Backdrop */
 .mobileMenu.open::before {
   content: '';
   position: fixed;
-  top: var(--nav-height);
+  top: 0;
   left: 300px;
   right: 0;
   bottom: 0;
@@ -219,27 +222,61 @@
   z-index: -1;
 }
 
-.themeToggle {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  padding: 0.5rem;
-  cursor: pointer;
-  border-radius: var(--radius-md);
-  transition: all 0.2s;
+.mobileNavLinks {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
+  flex-direction: column;
+  padding: 1.5rem;
+  gap: 0.5rem;
 }
 
-.themeToggle:hover {
-  color: var(--color-primary);
-  border-color: var(--color-primary);
+.mobileNavLinks a {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.mobileNavLinks a:hover {
   background: var(--bg-tertiary);
+  color: var(--color-primary);
 }
 
+.mobileUser,
+.mobileWallet {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mobileUser span {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  padding: 0 1rem;
+}
+
+.buttonSecondary {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.buttonSecondary:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Main Content Area */
 .main {
   flex: 1;
   width: 100%;
@@ -250,107 +287,108 @@
 /* Wallet Modal */
 .modalOverlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.3s ease-out;
+  padding: 1rem;
+  animation: fadeIn var(--transition-base);
 }
 
 .modalContent {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: var(--radius-xl);
-  width: 90%;
-  max-width: 420px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow-xl);
+  animation: scaleIn var(--transition-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modalHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .modalHeader h2 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
   margin: 0;
 }
 
 .modalClose {
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
   border: none;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: 1.5rem;
   cursor: pointer;
-  padding: 0.5rem;
-  line-height: 1;
-  transition: color 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .modalClose:hover {
+  background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
 .walletList {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 .walletOption {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  padding: 1rem 1.25rem;
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  text-align: left;
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
   font-weight: 500;
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .walletOption:hover {
   border-color: var(--color-primary);
-  background: rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.05);
+  background: var(--color-primary-glow);
   transform: translateX(4px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .noWallets {
   text-align: center;
   color: var(--text-secondary);
-  padding: 1rem;
+  padding: 1.5rem 1rem;
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes scaleIn {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(10px);
+    transform: scale(0.95) translateY(8px);
   }
   to {
     opacity: 1;
@@ -358,6 +396,7 @@
   }
 }
 
+/* Responsive */
 @media (max-width: 768px) {
   .navLinks,
   .desktopWallet {
@@ -365,17 +404,20 @@
   }
 
   .menuToggle {
-    display: block;
+    display: flex;
+  }
+  
+  .container {
+    padding: 0 1rem;
   }
 }
 
 @media (max-width: 480px) {
   .mobileMenu {
-    width: 280px !important;
-    left: -280px !important;
+    width: 100%;
   }
   
   .mobileMenu.open::before {
-    left: 280px;
+    display: none;
   }
 }
