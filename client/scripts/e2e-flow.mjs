@@ -106,15 +106,39 @@ async function main() {
       },
     });
 
-  const clientReg = await reg("client", seeds.client.address);
-  const freelancerReg = await reg("freelancer", seeds.freelancer.address);
-  if (clientReg.status !== 201 || freelancerReg.status !== 201) {
-    console.error("register failed", clientReg, freelancerReg);
+  // Register, or log back in if this test wallet was registered by a
+  // previous run (backend enforces one account per wallet address).
+  const regOrLogin = async (role, address) => {
+    const r = await reg(role, address);
+    if (r.status === 201) return r;
+    if (r.status === 409) {
+      const email = process.env[`E2E_${role.toUpperCase()}_EMAIL`];
+      if (!email) {
+        console.error(
+          `wallet already registered; set E2E_${role.toUpperCase()}_EMAIL to reuse the account`,
+        );
+        process.exit(1);
+      }
+      const login = await apiCall("/auth/login", {
+        method: "POST",
+        body: { email, password: "E2eTest123!secure" },
+      });
+      if (login.status !== 200) {
+        console.error("login failed", login);
+        process.exit(1);
+      }
+      log(`reusing existing ${role} account ${email}`);
+      return login;
+    }
+    console.error("register failed", r);
     process.exit(1);
-  }
+  };
+
+  const clientReg = await regOrLogin("client", seeds.client.address);
+  const freelancerReg = await regOrLogin("freelancer", seeds.freelancer.address);
   const clientToken = clientReg.json.token;
   const freelancerId = freelancerReg.json.user.id;
-  log("users registered:", clientReg.json.user.id, freelancerId);
+  log("users ready:", clientReg.json.user.id, freelancerId);
 
   // ---------- 2. Create contract ----------
   log("STEP 2: creating contract (2 milestones x 6 ADA)");

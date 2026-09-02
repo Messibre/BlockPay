@@ -5,6 +5,7 @@ import {
   resolveDataHash,
   BlockfrostProvider,
 } from "@meshsdk/core";
+import { OfflineEvaluator } from "@meshsdk/core-csl";
 import { contractScript } from "../constants/script";
 
 // Resolve the Blockfrost key in both Vite (import.meta.env) and Node
@@ -288,12 +289,27 @@ export const buildReleaseTransaction = async (
     "DEBUG: Using Script CBOR:",
     contractScript.cbor.slice(0, 20) + "...",
   );
-  // Initialize MeshTxBuilder
+  // Initialize MeshTxBuilder.
+  // IMPORTANT: use the LOCAL OfflineEvaluator (real Aiken VM) instead of
+  // Blockfrost's remote Ogmios evaluator. Blockfrost's evaluator fails on
+  // Plutus V3 spends with an unhelpful empty "ScriptFailures: {}" even for
+  // valid transactions, and gives no error detail when a script does fail.
   const blockfrostProvider = new BlockfrostProvider(getBlockfrostKey());
+  const network =
+    (typeof process !== "undefined" && process.env?.VITE_NETWORK) ||
+    (() => {
+      try {
+        return import.meta.env?.VITE_NETWORK;
+      } catch {
+        return undefined;
+      }
+    })() ||
+    "preprod";
+  const offlineEvaluator = new OfflineEvaluator(blockfrostProvider, network);
 
   const txBuilder = new MeshTxBuilder({
     fetcher: blockfrostProvider,
-    evaluator: blockfrostProvider,
+    evaluator: offlineEvaluator,
     verbose: false,
   }); // Manually fetch and provide UTXOs to the builder
 
