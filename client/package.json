@@ -12,9 +12,11 @@
     "clean:cache": "npm run clean"
   },
   "dependencies": {
-    "@meshsdk/common": "^1.9.0-beta.90",
-    "@meshsdk/core": "^1.9.0-beta.87",
-    "@meshsdk/react": "^1.9.0-beta.87",
+    "@harmoniclabs/uplc": "^2.0.7",
+    "@meshsdk/common": "^1.9.1",
+    "@meshsdk/core": "^1.9.1",
+    "@meshsdk/core-csl": "^1.9.1",
+    "@meshsdk/react": "^1.9.0-beta.98",
     "@tanstack/react-query": "^5.90.12",
     "axios": "^1.13.2",
     "react": "^19.2.0",
@@ -34,6 +36,7 @@
     "lodash-es": "^4.17.21",
     "tailwindcss": "^4.1.18",
     "vite": "^7.2.4",
+    "vite-node": "^6.0.0",
     "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

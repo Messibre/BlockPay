@@ -5,10 +5,13 @@ import User from '../models/User.js';
 import { createNotification } from './notificationController.js';
 
 // Get configured contract address (use env var for deployed script), otherwise keep fallback
+// Fallback = script address of the contract compiled with the REAL aiken stdlib
+// (hash 78ff54c0...). The previous address addr_test1wqhu... belongs to a broken
+// build compiled against stub libraries and must never be used again.
 const generateContractAddress = () => {
   return (
     process.env.ESCROW_SCRIPT_ADDRESS ||
-    'addr_test1wqhuaxvd0x5dyunjlzmc7nsrxur4x5s9xlnvlrwjgefg0qstf3kqv'
+    'addr_test1wpu074xqdv3upe34jgjrs05hjdrvhnj02ltfqq4ue97qlrsrp6ent'
   );
 };
 

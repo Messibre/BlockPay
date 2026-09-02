@@ -7,6 +7,38 @@ import {
 } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 
+// Optionally load the local Aiken-VM evaluator (@meshsdk/core-csl). It is a
+// WASM package that Vite cannot bundle for the browser, so it is imported
+// lazily with @vite-ignore: available in Node (tests/scripts), and silently
+// falling back to the Blockfrost evaluator in the browser build.
+const getEvaluator = async (provider, network) => {
+  try {
+    const mod = await import(/* @vite-ignore */ "@meshsdk/core-csl");
+    if (mod?.OfflineEvaluator) {
+      return new mod.OfflineEvaluator(provider, network);
+    }
+  } catch {
+    /* core-csl unavailable in this environment; use remote evaluator */
+  }
+  return provider;
+};
+
+// Resolve the Blockfrost key in both Vite (import.meta.env) and Node
+// (process.env) so the same code path can be exercised by tests/scripts.
+const getBlockfrostKey = () => {
+  try {
+    if (import.meta.env && import.meta.env.VITE_BLOCKFROST_KEY) {
+      return import.meta.env.VITE_BLOCKFROST_KEY;
+    }
+  } catch {
+    /* not running under Vite */
+  }
+  if (globalThis.process?.env?.VITE_BLOCKFROST_KEY) {
+    return globalThis.process.env.VITE_BLOCKFROST_KEY;
+  }
+  return undefined;
+};
+
 // Constants;
 
 export const lovelaceToAda = (lovelace) => {
@@ -157,9 +189,7 @@ export const buildDepositTransaction = async (
   datum,
 ) => {
   // Initialize MeshTxBuilder
-  const blockfrostProvider = new BlockfrostProvider(
-    import.meta.env.VITE_BLOCKFROST_KEY,
-  );
+  const blockfrostProvider = new BlockfrostProvider(getBlockfrostKey());
   const txBuilder = new MeshTxBuilder({
     fetcher: blockfrostProvider,
     evaluator: blockfrostProvider,
@@ -274,14 +304,26 @@ export const buildReleaseTransaction = async (
     "DEBUG: Using Script CBOR:",
     contractScript.cbor.slice(0, 20) + "...",
   );
-  // Initialize MeshTxBuilder
-  const blockfrostProvider = new BlockfrostProvider(
-    import.meta.env.VITE_BLOCKFROST_KEY,
-  );
+  // Initialize MeshTxBuilder.
+  // Prefer the LOCAL OfflineEvaluator (real Aiken VM, precise error messages)
+  // when available (Node scripts/tests); fall back to Blockfrost's remote
+  // evaluator in the browser where the WASM evaluator cannot be bundled.
+  const blockfrostProvider = new BlockfrostProvider(getBlockfrostKey());
+  const network =
+    globalThis.process?.env?.VITE_NETWORK ||
+    (() => {
+      try {
+        return import.meta.env?.VITE_NETWORK;
+      } catch {
+        return undefined;
+      }
+    })() ||
+    "preprod";
+  const evaluator = await getEvaluator(blockfrostProvider, network);
 
   const txBuilder = new MeshTxBuilder({
     fetcher: blockfrostProvider,
-    evaluator: blockfrostProvider,
+    evaluator,
     verbose: false,
   }); // Manually fetch and provide UTXOs to the builder
 
@@ -401,8 +443,31 @@ export const buildReleaseTransaction = async (
 // hex-encoded milestone id AND the client's payment key hash. This prevents
 // spending an unrelated UTxO at the shared script address (there can be many
 // contracts' deposits at the same address), which makes the validator fail.
-export const findEscrowUtxo = (utxos, { milestoneId, clientAddress } = {}) => {
+export const findEscrowUtxo = (
+  utxos,
+  { milestoneId, clientAddress, depositTxHashes } = {},
+) => {
   if (!utxos || utxos.length === 0) return null;
+
+  // STRONGEST match first: the app records every deposit's txHash in the
+  // contract document. A UTxO created by one of THIS contract's deposit
+  // transactions is unambiguous — datum-content matching alone is NOT,
+  // because two contracts can share milestone ids ("ms-001") and client.
+  if (depositTxHashes && depositTxHashes.length > 0) {
+    const hashes = depositTxHashes
+      .filter(Boolean)
+      .map((h) => String(h).toLowerCase());
+    const byDeposit = utxos.filter((u) => {
+      const tx = String(u?.input?.txHash || u?.txHash || "").toLowerCase();
+      return hashes.includes(tx);
+    });
+    if (byDeposit.length === 1) return byDeposit[0];
+    if (byDeposit.length > 1) {
+      // Multiple deposits: continue matching on datum content below,
+      // but only among this contract's own UTxOs.
+      utxos = byDeposit;
+    }
+  }
 
   const toHex = (s) =>
     Array.from(new TextEncoder().encode(String(s)))
