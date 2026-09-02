@@ -3,8 +3,8 @@
 // Supports milestones, releases, withdrawals, refunds, and arbitration
 
 use aiken/collection/list
+use aiken/interval.{Finite}
 use cardano/transaction.{OutputReference, Transaction, placeholder}
-use sian_lab/vodka/mocktail.{mock_utxo_ref}
 
 // Datum structure stored on-chain
 pub type EscrowDatum {
@@ -144,8 +144,11 @@ validator escrow {
                 // Check expiration if set
                 when datum.expiration is {
                   Some(exp_time) -> {
-                    // Allow refund if expired
-                    tx.valid_range.start > exp_time
+                    // Allow refund if expired (tx lower bound after expiration)
+                    when tx.validity_range.lower_bound.bound_type is {
+                      Finite(lower) -> lower > exp_time
+                      _ -> False
+                    }
                   }
                   None -> False  // Can't refund if milestones are paid and no expiration
                 }
@@ -208,6 +211,13 @@ fn has_paid_milestone(milestones: List<Milestone>) -> Bool {
 }
 
 // Test helpers
+fn mock_utxo_ref(_a: Int, index: Int) -> OutputReference {
+  OutputReference {
+    transaction_id: #"0000000000000000000000000000000000000000000000000000000000000000",
+    output_index: index,
+  }
+}
+
 fn sample_client() -> ByteArray {
   #"a1"
 }
