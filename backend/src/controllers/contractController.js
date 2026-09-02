@@ -434,16 +434,24 @@ export const approveMilestone = async (req, res, next) => {
           message: 'Freelancer has no linked wallet address to verify the payout against',
         });
       }
-      const milestoneAmount = milestone.amount;
+      // milestone.amount is stored in LOVELACE (see Contract model) - do NOT
+      // multiply by 1e6 again. Doing so made verification demand a payout a
+      // million times larger than the real one and 422'd every valid release.
+      const milestoneLovelace = Number(milestone.amount);
       const feePercent = contract.datum.feePercent || 100;
-      const feeAmount = Math.floor((milestoneAmount * feePercent) / 10000);
-      const payoutAmount = milestoneAmount - feeAmount;
+      const feeLovelace = Math.floor((milestoneLovelace * feePercent) / 10000);
+      const payoutLovelace = milestoneLovelace - feeLovelace;
 
-      // Verify payout to freelancer and platform fee (if configured)
-      const platformFeeAddress = process.env.PLATFORM_FEE_ADDRESS || null;
-      // Convert ADA amounts to lovelace for on-chain verification
-      const payoutLovelace = Math.round(Number(payoutAmount) * 1_000_000);
-      const feeLovelace = Math.round(Number(feeAmount) * 1_000_000);
+      // Verify payout to freelancer and platform fee (if configured).
+      // The frontend only adds a separate fee output when it clears Cardano's
+      // min-UTxO (~1 ADA) - tiny fees stay with the change instead. Mirror
+      // that rule here or every small-fee release gets rejected with
+      // "No output to platform fee recipient found".
+      const MIN_UTXO_LOVELACE = 1_000_000;
+      const platformFeeAddress =
+        feeLovelace >= MIN_UTXO_LOVELACE
+          ? process.env.PLATFORM_FEE_ADDRESS || null
+          : null;
 
       const verification = await verifyPayout(
         txHash,
@@ -473,11 +481,12 @@ export const approveMilestone = async (req, res, next) => {
         }
       }
 
+      const payoutAda = payoutLovelace / 1_000_000;
       const payment = new Payment({
         contractId,
         milestoneId,
         paymentType: 'release',
-        amountADA: payoutAmount,
+        amountADA: payoutAda,
         txHash,
         status: verification.status || 'CONFIRMED',
         blockTime: verification.blockTime,
@@ -487,7 +496,7 @@ export const approveMilestone = async (req, res, next) => {
         toAddress: freelancerAddress,
         signerAddress: req.body.signerAddress || null,
         signerSignature: req.body.signerSignature || null,
-        feeAmount: feeAmount > 0 ? feeAmount : undefined,
+        feeAmount: feeLovelace > 0 ? feeLovelace / 1_000_000 : undefined,
         feeAddress: platformFeeAddress || undefined,
       });
 
@@ -498,7 +507,7 @@ export const approveMilestone = async (req, res, next) => {
         recipientId: contract.freelancerId,
         type: 'payment_received',
         title: 'Payment Released',
-        message: `Payment of ${payoutAmount} ADA for milestone "${milestone.title}" has been released.`,
+        message: `Payment of ${payoutAda} ADA for milestone "${milestone.title}" has been released.`,
         relatedId: contract._id,
       });
     }

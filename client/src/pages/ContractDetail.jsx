@@ -323,7 +323,23 @@ export default function ContractDetail() {
     }
 
     setIsApproving({ ...isApproving, [milestoneId]: true });
+    // If a release tx for this milestone was already submitted on-chain but
+    // the backend failed to record it (e.g. it was down or rejected the
+    // recording), retry ONLY the recording - never build a second release
+    // transaction for the same milestone.
+    const pendingKey = `pendingRelease:${id}:${milestoneId}`;
     try {
+      const pendingTxHash = localStorage.getItem(pendingKey);
+      if (pendingTxHash) {
+        await api.approveMilestone(id, milestoneId, pendingTxHash);
+        localStorage.removeItem(pendingKey);
+        success(
+          `Milestone release recorded! TX: ${pendingTxHash.slice(0, 16)}...`,
+        );
+        queryClient.invalidateQueries(["contract", id]);
+        return;
+      }
+
       const milestone = contract.milestones.find((m) => m.id === milestoneId);
       if (!milestone) {
         throw new Error("Milestone not found");
@@ -491,8 +507,14 @@ export default function ContractDetail() {
         feeAmount,
       );
 
+      // The tx is now on-chain. Persist the hash BEFORE recording with the
+      // backend so a recording failure can be retried without rebuilding
+      // (and double-spending) the release transaction.
+      localStorage.setItem(pendingKey, txHash);
+
       // 7. Record release with backend
       await api.approveMilestone(id, milestoneId, txHash);
+      localStorage.removeItem(pendingKey);
 
       success(`Milestone approved & released! TX: ${txHash.slice(0, 16)}...`);
       queryClient.invalidateQueries(["contract", id]);
@@ -501,11 +523,16 @@ export default function ContractDetail() {
       // Prefer backend-provided message/details for clarity
       const resp = error.response?.data;
       const details = resp?.details ? resp.details.join("; ") : null;
-      const msg =
+      let msg =
         details ||
         resp?.message ||
         error.message ||
         "Failed to approve milestone";
+      // If the on-chain release succeeded but backend recording failed, make
+      // clear the funds already moved and a retry will only re-record.
+      if (localStorage.getItem(pendingKey)) {
+        msg = `The payment was released on-chain, but recording it failed: ${msg} - click Approve again to retry recording (no new payment will be made).`;
+      }
       showError(msg);
       // Log full response for debugging
        
