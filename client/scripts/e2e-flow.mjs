@@ -140,33 +140,54 @@ async function main() {
   const freelancerId = freelancerReg.json.user.id;
   log("users ready:", clientReg.json.user.id, freelancerId);
 
-  // ---------- 2. Create contract ----------
-  log("STEP 2: creating contract (2 milestones x 6 ADA)");
-  const milestones = [
-    { id: "ms-001", title: "First deliverable", amount: 6_000_000 },
-    { id: "ms-002", title: "Final deliverable", amount: 6_000_000 },
-  ];
-  const created = await apiCall("/contracts", {
-    method: "POST",
-    token: clientToken,
-    body: {
-      jobId: "507f1f77bcf86cd799439011", // placeholder ObjectId (no job flow in this test)
-      freelancerId,
-      totalAmount: 12_000_000,
-      milestones,
-    },
-  });
-  if (created.status !== 201) {
-    console.error("createContract failed", created);
-    process.exit(1);
-  }
-  const { contractId, contractAddress, contractDatum } = created.json;
-  log("contract created:", contractId, "script address:", contractAddress);
-
-  // ---------- 3. Deposit (mirrors ContractDetail.jsx proceedWithDeposit) ----------
-  log("STEP 3: building + signing + submitting DEPOSIT (12 ADA)");
   const clientWallet = await mkWallet(seeds.client.mnemonic);
   const clientAddr = seeds.client.address;
+
+  let contractId;
+  let contractAddress;
+  let contractDatum;
+  let depositTxHash;
+
+  if (process.env.E2E_RESUME_CONTRACT_ID && process.env.E2E_RESUME_DEPOSIT_TX) {
+    // ---------- Resume mode: reuse an existing funded contract ----------
+    contractId = process.env.E2E_RESUME_CONTRACT_ID;
+    depositTxHash = process.env.E2E_RESUME_DEPOSIT_TX;
+    log("RESUME MODE: contract", contractId, "deposit", depositTxHash.slice(0, 16));
+    const fetched = await apiCall(`/contracts/${contractId}`, {
+      token: clientToken,
+    });
+    if (fetched.status !== 200) {
+      console.error("fetch contract failed", fetched);
+      process.exit(1);
+    }
+    const c = fetched.json.contract || fetched.json;
+    contractAddress = c.contractAddress;
+    contractDatum = c.datum;
+    log("resumed contract at:", contractAddress);
+  } else {
+    // ---------- 2. Create contract ----------
+    log("STEP 2: creating contract (2 milestones x 6 ADA)");
+    const milestones = [
+      { id: "ms-001", title: "First deliverable", amount: 6_000_000 },
+      { id: "ms-002", title: "Final deliverable", amount: 6_000_000 },
+    ];
+    const created = await apiCall("/contracts", {
+      method: "POST",
+      token: clientToken,
+      body: {
+        jobId: "507f1f77bcf86cd799439011", // placeholder ObjectId (no job flow in this test)
+        freelancerId,
+        totalAmount: 12_000_000,
+        milestones,
+      },
+    });
+    if (created.status !== 201) {
+      console.error("createContract failed", created);
+      process.exit(1);
+    }
+    ({ contractId, contractAddress, contractDatum } = created.json);
+    log("contract created:", contractId, "script address:", contractAddress);
+  }
 
   const datum = {
     client: contractDatum.client,
@@ -182,22 +203,26 @@ async function main() {
     arbitrator: contractDatum.client,
   };
 
-  const depositTxHash = await buildDepositTransaction(
-    clientWallet,
-    contractAddress,
-    contractDatum.totalAmount,
-    datum,
-  );
-  log("deposit submitted:", depositTxHash);
+  if (!depositTxHash) {
+    // ---------- 3. Deposit (mirrors ContractDetail.jsx proceedWithDeposit) ----------
+    log("STEP 3: building + signing + submitting DEPOSIT (12 ADA)");
+    depositTxHash = await buildDepositTransaction(
+      clientWallet,
+      contractAddress,
+      contractDatum.totalAmount,
+      datum,
+    );
+    log("deposit submitted:", depositTxHash);
 
-  const recorded = await apiCall(`/contracts/${contractId}/deposit`, {
-    method: "POST",
-    token: clientToken,
-    body: { txHash: depositTxHash, amount: contractDatum.totalAmount },
-  });
-  log("recordDeposit ->", recorded.status, JSON.stringify(recorded.json).slice(0, 200));
+    const recorded = await apiCall(`/contracts/${contractId}/deposit`, {
+      method: "POST",
+      token: clientToken,
+      body: { txHash: depositTxHash, amount: contractDatum.totalAmount },
+    });
+    log("recordDeposit ->", recorded.status, JSON.stringify(recorded.json).slice(0, 200));
 
-  await waitForTx(depositTxHash, "DEPOSIT");
+    await waitForTx(depositTxHash, "DEPOSIT");
+  }
 
   // ---------- 4. Release milestone ms-001 (mirrors handleApproveMilestone) ----------
   log("STEP 4: building + signing + submitting RELEASE for ms-001");
@@ -210,6 +235,7 @@ async function main() {
   const rawUtxo = findEscrowUtxo(onChainUtxos, {
     milestoneId,
     clientAddress: clientAddr,
+    depositTxHashes: [depositTxHash],
   });
   if (!rawUtxo) throw new Error("findEscrowUtxo returned no match!");
   log(

@@ -429,8 +429,31 @@ export const buildReleaseTransaction = async (
 // hex-encoded milestone id AND the client's payment key hash. This prevents
 // spending an unrelated UTxO at the shared script address (there can be many
 // contracts' deposits at the same address), which makes the validator fail.
-export const findEscrowUtxo = (utxos, { milestoneId, clientAddress } = {}) => {
+export const findEscrowUtxo = (
+  utxos,
+  { milestoneId, clientAddress, depositTxHashes } = {},
+) => {
   if (!utxos || utxos.length === 0) return null;
+
+  // STRONGEST match first: the app records every deposit's txHash in the
+  // contract document. A UTxO created by one of THIS contract's deposit
+  // transactions is unambiguous — datum-content matching alone is NOT,
+  // because two contracts can share milestone ids ("ms-001") and client.
+  if (depositTxHashes && depositTxHashes.length > 0) {
+    const hashes = depositTxHashes
+      .filter(Boolean)
+      .map((h) => String(h).toLowerCase());
+    const byDeposit = utxos.filter((u) => {
+      const tx = String(u?.input?.txHash || u?.txHash || "").toLowerCase();
+      return hashes.includes(tx);
+    });
+    if (byDeposit.length === 1) return byDeposit[0];
+    if (byDeposit.length > 1) {
+      // Multiple deposits: continue matching on datum content below,
+      // but only among this contract's own UTxOs.
+      utxos = byDeposit;
+    }
+  }
 
   const toHex = (s) =>
     Array.from(new TextEncoder().encode(String(s)))

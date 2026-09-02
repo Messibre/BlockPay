@@ -417,12 +417,17 @@ export default function ContractDetail() {
         );
       }
 
-      // 3. Find the UTXO that belongs to THIS contract (match by inline
-      // datum content: milestone id + client key hash). NEVER take the first
-      // UTXO blindly - the script address holds deposits from many contracts.
+      // 3. Find the UTXO that belongs to THIS contract. Match primarily by
+      // this contract's recorded deposit tx hashes (unambiguous), falling
+      // back to inline-datum content (milestone id + client key hash).
+      // NEVER take the first UTXO blindly - the script address holds
+      // deposits from many contracts.
       const rawUtxo = findEscrowUtxo(onChainUtxos, {
         milestoneId,
         clientAddress: clientAddr,
+        depositTxHashes: (contract.deposits || [])
+          .map((d) => d.txHash)
+          .filter(Boolean),
       });
 
       if (!rawUtxo) {
