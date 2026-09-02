@@ -4,6 +4,8 @@ import {
   resolvePlutusScriptAddress,
   resolveDataHash,
   BlockfrostProvider,
+  unixTimeToEnclosingSlot,
+  SLOT_CONFIG_NETWORK,
 } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 
@@ -541,6 +543,191 @@ export const findEscrowUtxo = (
   }
 
   return matches[0] || null;
+};
+
+// Shared setup for transactions that SPEND from the escrow script:
+// builder + wallet UTXO selection + mandatory Plutus collateral.
+const setupScriptSpend = async (wallet) => {
+  const blockfrostProvider = new BlockfrostProvider(getBlockfrostKey());
+  const network =
+    globalThis.process?.env?.VITE_NETWORK ||
+    (() => {
+      try {
+        return import.meta.env?.VITE_NETWORK;
+      } catch {
+        return undefined;
+      }
+    })() ||
+    "preprod";
+  const evaluator = await getEvaluator(blockfrostProvider, network);
+
+  const txBuilder = new MeshTxBuilder({
+    fetcher: blockfrostProvider,
+    evaluator,
+    verbose: false,
+  });
+
+  const walletUtxos = await wallet.getUtxos();
+  const cleanUtxos = JSON.parse(JSON.stringify(walletUtxos));
+  txBuilder.selectUtxosFrom(cleanUtxos);
+
+  // Collateral is MANDATORY for Plutus script spends (same policy as
+  // buildReleaseTransaction: reserved collateral first, then a pure-ADA UTXO).
+  const collateralUtxos = await wallet.getCollateral();
+  let collateral = collateralUtxos && collateralUtxos[0];
+  if (!collateral) {
+    const pureAda = cleanUtxos
+      .filter((u) => {
+        const amt = u?.output?.amount || [];
+        return amt.length === 1 && amt[0].unit === "lovelace";
+      })
+      .sort(
+        (a, b) =>
+          Number(b.output.amount[0].quantity) -
+          Number(a.output.amount[0].quantity),
+      );
+    collateral =
+      pureAda.find((u) => Number(u.output.amount[0].quantity) >= 5_000_000) ||
+      pureAda.find((u) => Number(u.output.amount[0].quantity) >= 1_500_000);
+  }
+  if (!collateral) {
+    throw new Error(
+      "No collateral available. Enable/reserve collateral in your wallet " +
+        "settings (Eternl: Wallet > Collateral), or keep a pure-ADA UTXO of " +
+        "at least 1.5 ADA in your wallet, then try again.",
+    );
+  }
+  txBuilder.txInCollateral(
+    collateral.input.txHash,
+    collateral.input.outputIndex,
+    collateral.output.amount,
+    collateral.output.address,
+  );
+
+  return { txBuilder, network };
+};
+
+/**
+ * Refund: client reclaims the escrow's remaining funds.
+ * Validator rules (escrow.ak Refund):
+ *  - client must sign
+ *  - allowed when NO milestone is paid, OR
+ *  - when milestones are paid: datum.expiration must be set AND the tx
+ *    validity range's LOWER bound must be strictly after the expiration -
+ *    i.e. the tx must set invalidBefore (afterExpiration = true).
+ */
+export const buildRefundTransaction = async (
+  wallet,
+  scriptAddress,
+  currentDatum,
+  refundAmountLovelace,
+  clientAddress,
+  formattedUtxo,
+  { afterExpiration = false } = {},
+) => {
+  const { txBuilder, network } = await setupScriptSpend(wallet);
+
+  // Client signs
+  txBuilder.requiredSignerHash(resolvePaymentKeyHash(clientAddress));
+
+  // Spend the escrow UTXO with the Refund redeemer
+  txBuilder.spendingPlutusScriptV3();
+  txBuilder.txIn(
+    formattedUtxo.input.txHash,
+    formattedUtxo.input.outputIndex,
+    formattedUtxo.output.amount,
+    formattedUtxo.output.address,
+  );
+  txBuilder.txInScript(contractScript.cbor);
+  txBuilder.txInRedeemerValue(createRedeemerData.refund());
+  txBuilder.txInInlineDatumPresent();
+
+  // Expired-contract refunds REQUIRE a finite validity lower bound: the
+  // validator checks lower_bound > expiration. Set invalidBefore to the slot
+  // enclosing "now" (past the expiration by definition when afterExpiration).
+  if (afterExpiration) {
+    const expirationMs =
+      typeof currentDatum.expiration === "number"
+        ? currentDatum.expiration
+        : new Date(currentDatum.expiration).getTime();
+    if (!expirationMs || Date.now() <= expirationMs) {
+      throw new Error(
+        "Refund with paid milestones is only allowed AFTER the contract expiration.",
+      );
+    }
+    const slotConfig = SLOT_CONFIG_NETWORK[network] || SLOT_CONFIG_NETWORK.preprod;
+    const nowSlot = unixTimeToEnclosingSlot(Date.now(), slotConfig);
+    txBuilder.invalidBefore(nowSlot);
+  }
+
+  // Return the full remaining escrow value to the client
+  txBuilder.txOut(clientAddress, [
+    { unit: "lovelace", quantity: refundAmountLovelace.toString() },
+  ]);
+
+  const changeAddress = await wallet.getChangeAddress();
+  txBuilder.changeAddress(changeAddress);
+
+  const unsignedTx = await txBuilder.complete();
+  const signedTx = await wallet.signTx(unsignedTx);
+  const txHash = await wallet.submitTx(signedTx);
+  return txHash;
+};
+
+/**
+ * Withdraw: freelancer claims funds for a milestone the on-chain datum marks
+ * as paid (recovery path - the normal Release flow pays directly).
+ * Validator rules (escrow.ak Withdraw): freelancer signs + milestone.paid.
+ */
+export const buildWithdrawTransaction = async (
+  wallet,
+  scriptAddress,
+  milestoneId,
+  currentDatum,
+  withdrawAmountLovelace,
+  freelancerAddress,
+  remainingAmountLovelace,
+  formattedUtxo,
+) => {
+  const { txBuilder } = await setupScriptSpend(wallet);
+
+  // Freelancer signs
+  txBuilder.requiredSignerHash(resolvePaymentKeyHash(freelancerAddress));
+
+  txBuilder.spendingPlutusScriptV3();
+  txBuilder.txIn(
+    formattedUtxo.input.txHash,
+    formattedUtxo.input.outputIndex,
+    formattedUtxo.output.amount,
+    formattedUtxo.output.address,
+  );
+  txBuilder.txInScript(contractScript.cbor);
+  txBuilder.txInRedeemerValue(createRedeemerData.withdraw(milestoneId));
+  txBuilder.txInInlineDatumPresent();
+
+  // Payout to freelancer
+  txBuilder.txOut(freelancerAddress, [
+    { unit: "lovelace", quantity: withdrawAmountLovelace.toString() },
+  ]);
+
+  // Re-lock any remainder at the script with the SAME datum (the milestone is
+  // already marked paid in it - nothing to update).
+  if (remainingAmountLovelace > 0) {
+    const script = { code: contractScript.cbor, version: "V3" };
+    const actualScriptAddress = resolvePlutusScriptAddress(script, 0);
+    txBuilder.txOut(actualScriptAddress, [
+      { unit: "lovelace", quantity: remainingAmountLovelace.toString() },
+    ]);
+    txBuilder.txOutInlineDatumValue(toMeshDatum(currentDatum));
+  }
+
+  const changeAddress = await wallet.getChangeAddress();
+  txBuilder.changeAddress(changeAddress);
+
+  const unsignedTx = await txBuilder.complete();
+  const signedTx = await wallet.signTx(unsignedTx);
+  const txHash = await wallet.submitTx(signedTx);
+  return txHash;
 };
 
 // Helper: Find UTxO matching the contract datum
