@@ -16,6 +16,8 @@ import BackButton from "../components/BackButton.jsx";
 import {
   buildDepositTransaction,
   buildReleaseTransaction,
+  buildRefundTransaction,
+  buildWithdrawTransaction,
   lovelaceToAda,
   findEscrowUtxo,
 } from "../utils/transactions.js";
@@ -39,6 +41,10 @@ export default function ContractDetail() {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [submissionNote, setSubmissionNote] = useState("");
   const [selectedMilestone, setSelectedMilestone] = useState(null);
+  // Refund / Withdraw state
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState({});
 
   const {
     data: contract,
@@ -582,6 +588,271 @@ export default function ContractDetail() {
     }
   };
 
+  // Shared: rebuild the current on-chain datum and locate this contract's
+  // escrow UTXO at the script address (same matching rules as the release flow).
+  const locateEscrowUtxo = async (milestoneId = null) => {
+    const isBech32 = (s) =>
+      typeof s === "string" &&
+      /^(addr1|addr_test1)[0-9a-z]+$/.test(s) &&
+      s.length >= 8;
+
+    const clientAddr = isBech32(contract.datum?.client)
+      ? contract.datum.client
+      : null;
+    const freelancerAddr = isBech32(contract.datum?.freelancer)
+      ? contract.datum.freelancer
+      : isBech32(contract.freelancerId?.walletAddress)
+        ? contract.freelancerId.walletAddress
+        : null;
+    if (!clientAddr) throw new Error("Invalid client address on contract");
+    if (!freelancerAddr)
+      throw new Error("Invalid freelancer address on contract");
+
+    if (!contract.datum?.contractNonce) {
+      throw new Error(
+        "Contract is missing its on-chain nonce (datum.contractNonce) - cannot rebuild the escrow datum.",
+      );
+    }
+
+    const feeAddr = isBech32(contract.datum?.feeAddress)
+      ? contract.datum.feeAddress
+      : null;
+    const arbitratorAddr = isBech32(contract.datum?.arbitrator)
+      ? contract.datum.arbitrator
+      : null;
+
+    const currentDatum = {
+      client: clientAddr,
+      freelancer: freelancerAddr,
+      total_amount: contract.totalAmount,
+      milestones:
+        contract.datum?.milestones ||
+        (contract.milestones || []).map((m) => ({
+          id: m.id,
+          amount: m.amount,
+          paid: m.status === "approved" || m.status === "paid",
+        })),
+      contract_nonce: contract.datum.contractNonce,
+      fee_percent: contract.datum?.feePercent || 100,
+      fee_address: feeAddr || clientAddr,
+      expiration: contract.datum?.expiration || null,
+      arbitrator: arbitratorAddr || clientAddr,
+    };
+
+    const escrowAddress = contract.contractAddress || scriptAddress;
+    const blockfrostProvider = new BlockfrostProvider(
+      import.meta.env.VITE_BLOCKFROST_KEY,
+    );
+    let onChainUtxos = [];
+    try {
+      onChainUtxos = await blockfrostProvider.fetchAddressUTxOs(escrowAddress);
+    } catch {
+      onChainUtxos = await blockfrostProvider.fetchUtxos(escrowAddress);
+    }
+    if (!onChainUtxos || onChainUtxos.length === 0) {
+      throw new Error(`No funds found at: ${escrowAddress}.`);
+    }
+
+    const rawUtxo = findEscrowUtxo(onChainUtxos, {
+      milestoneId,
+      clientAddress: clientAddr,
+      depositTxHashes: (contract.deposits || [])
+        .map((d) => d.txHash)
+        .filter(Boolean),
+    });
+    if (!rawUtxo) {
+      throw new Error(
+        `No escrow UTXO for this contract found at ${escrowAddress}. The deposit may not be confirmed yet.`,
+      );
+    }
+
+    const formattedUtxo = {
+      input: {
+        txHash: rawUtxo.txHash || rawUtxo.input?.txHash,
+        outputIndex: rawUtxo.outputIndex ?? rawUtxo.input?.outputIndex,
+      },
+      output: {
+        address: escrowAddress,
+        amount: rawUtxo.amount || rawUtxo.output?.amount,
+      },
+    };
+
+    return { currentDatum, formattedUtxo, clientAddr, freelancerAddr };
+  };
+
+  // Client cancels the contract and reclaims remaining escrow funds.
+  const handleRefund = async () => {
+    if (!connected || !wallet) {
+      showError("Please connect your wallet first");
+      return;
+    }
+    setIsRefundModalOpen(false);
+    setIsRefunding(true);
+    const pendingKey = `pendingRefund:${id}`;
+    try {
+      // Recording-only retry: the refund tx already went on-chain earlier.
+      const pendingTxHash = localStorage.getItem(pendingKey);
+      if (pendingTxHash) {
+        await api.refundContract(id, pendingTxHash);
+        localStorage.removeItem(pendingKey);
+        success(`Refund recorded! TX: ${pendingTxHash.slice(0, 16)}...`);
+        queryClient.invalidateQueries(["contract", id]);
+        return;
+      }
+
+      const { currentDatum, formattedUtxo, clientAddr } =
+        await locateEscrowUtxo();
+
+      const paidLovelace = currentDatum.milestones
+        .filter((m) => m.paid)
+        .reduce((sum, m) => sum + Number(m.amount), 0);
+      const refundLovelace = Number(contract.totalAmount) - paidLovelace;
+      if (refundLovelace <= 0) {
+        throw new Error("Nothing left in escrow to refund.");
+      }
+
+      // Validator rule: with paid milestones, refund only after expiration
+      // (and the tx must set invalidBefore - handled by the builder).
+      const afterExpiration = paidLovelace > 0;
+
+      const txHash = await buildRefundTransaction(
+        wallet,
+        contract.contractAddress || scriptAddress,
+        currentDatum,
+        refundLovelace,
+        clientAddr,
+        formattedUtxo,
+        { afterExpiration },
+      );
+
+      localStorage.setItem(pendingKey, txHash);
+      await api.refundContract(id, txHash);
+      localStorage.removeItem(pendingKey);
+
+      success(
+        `Contract refunded - ${lovelaceToAda(refundLovelace)} ADA returned! TX: ${txHash.slice(0, 16)}...`,
+      );
+      queryClient.invalidateQueries(["contract", id]);
+    } catch (error) {
+      console.error("Refund error:", error);
+      const resp = error.response?.data;
+      let msg = resp?.message || error.message || "Failed to refund contract";
+      if (localStorage.getItem(pendingKey)) {
+        msg = `The refund was sent on-chain, but recording it failed: ${msg} - click Refund again to retry recording (no new transaction will be made).`;
+      }
+      showError(msg);
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
+  // Freelancer recovers a milestone that is marked paid on-chain but whose
+  // payout never reached them (e.g. the release tx was rejected after datum
+  // update, or funds were re-locked without payout).
+  const handleWithdraw = async (milestoneId) => {
+    if (!connected || !wallet) {
+      showError("Please connect your wallet first");
+      return;
+    }
+    setIsWithdrawing({ ...isWithdrawing, [milestoneId]: true });
+    const pendingKey = `pendingWithdraw:${id}:${milestoneId}`;
+    try {
+      const pendingTxHash = localStorage.getItem(pendingKey);
+      if (pendingTxHash) {
+        await api.withdrawMilestone(id, milestoneId, pendingTxHash);
+        localStorage.removeItem(pendingKey);
+        success(`Withdrawal recorded! TX: ${pendingTxHash.slice(0, 16)}...`);
+        queryClient.invalidateQueries(["contract", id]);
+        return;
+      }
+
+      const milestone = contract.milestones.find((m) => m.id === milestoneId);
+      if (!milestone) throw new Error("Milestone not found");
+
+      const { currentDatum, formattedUtxo, freelancerAddr } =
+        await locateEscrowUtxo(milestoneId);
+
+      // Same fee math as the release flow
+      const milestoneLovelace = Number(milestone.amount);
+      const feePercent = currentDatum.fee_percent;
+      const feeLovelace = Math.floor((milestoneLovelace * feePercent) / 10000);
+      const withdrawLovelace = milestoneLovelace - feeLovelace;
+
+      // Remainder = what's in the UTXO minus this milestone's full amount
+      const utxoLovelace = Number(
+        (formattedUtxo.output.amount || []).find(
+          (a) => a.unit === "lovelace",
+        )?.quantity || 0,
+      );
+      const remainingLovelace = utxoLovelace - milestoneLovelace;
+
+      const txHash = await buildWithdrawTransaction(
+        wallet,
+        contract.contractAddress || scriptAddress,
+        milestoneId,
+        currentDatum,
+        withdrawLovelace,
+        freelancerAddr,
+        remainingLovelace,
+        formattedUtxo,
+      );
+
+      localStorage.setItem(pendingKey, txHash);
+      await api.withdrawMilestone(id, milestoneId, txHash);
+      localStorage.removeItem(pendingKey);
+
+      success(
+        `Withdrew ${lovelaceToAda(withdrawLovelace)} ADA! TX: ${txHash.slice(0, 16)}...`,
+      );
+      queryClient.invalidateQueries(["contract", id]);
+    } catch (error) {
+      console.error("Withdraw error:", error);
+      const resp = error.response?.data;
+      let msg = resp?.message || error.message || "Failed to withdraw";
+      if (localStorage.getItem(pendingKey)) {
+        msg = `The withdrawal was sent on-chain, but recording it failed: ${msg} - click Withdraw again to retry recording (no new transaction will be made).`;
+      }
+      showError(msg);
+    } finally {
+      setIsWithdrawing({ ...isWithdrawing, [milestoneId]: false });
+    }
+  };
+
+  // Refund eligibility (mirrors validator rules so we don't build doomed txs)
+  const paidMilestonesExist = (contract?.datum?.milestones || []).some(
+    (m) => m.paid,
+  );
+  const expirationMs = contract?.datum?.expiration
+    ? new Date(contract.datum.expiration).getTime()
+    : null;
+  const isExpired = expirationMs ? Date.now() > expirationMs : false;
+  const canRefund =
+    isClient &&
+    isFunded &&
+    contract?.offchainState !== "CANCELLED" &&
+    (!paidMilestonesExist || isExpired);
+
+  // Withdraw eligibility per milestone: paid on-chain but no confirmed payout
+  const confirmedPayoutMilestoneIds = new Set(
+    (contract?.releases || [])
+      .filter(
+        (r) =>
+          r.status === "CONFIRMED" &&
+          (r.paymentType === "release" || r.paymentType === "payout"),
+      )
+      .map((r) => r.milestoneId)
+      .filter(Boolean),
+  );
+  const canWithdrawMilestone = (milestone) => {
+    if (!isFreelancer) return false;
+    const datumMilestone = (contract?.datum?.milestones || []).find(
+      (m) => m.id === milestone.id,
+    );
+    return (
+      !!datumMilestone?.paid && !confirmedPayoutMilestoneIds.has(milestone.id)
+    );
+  };
+
   return (
     <div className={styles.contractDetail}>
       <div className={styles.container}>
@@ -770,6 +1041,53 @@ export default function ContractDetail() {
             </div>
           </Modal>
 
+          {/* Refund Section for Clients */}
+          {canRefund && (
+            <Card className={styles.depositSection}>
+              <h2>Cancel &amp; Refund</h2>
+              <p className={styles.depositInfo}>
+                {paidMilestonesExist
+                  ? "The contract has expired. You can reclaim the remaining escrow funds (already-paid milestones stay with the freelancer)."
+                  : "No milestones have been paid yet. You can cancel this contract and reclaim the full escrow deposit."}
+              </p>
+              {!connected && (
+                <p className={styles.walletWarning}>
+                  Please connect your wallet to request a refund.
+                </p>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => setIsRefundModalOpen(true)}
+                disabled={!connected || isRefunding}
+              >
+                {isRefunding ? "Processing..." : "Cancel Contract & Refund"}
+              </Button>
+            </Card>
+          )}
+
+          <Modal
+            isOpen={isRefundModalOpen}
+            onClose={() => setIsRefundModalOpen(false)}
+            title="Cancel contract and refund?"
+          >
+            <p>
+              This permanently cancels the contract on-chain and returns the
+              remaining escrow funds to your wallet. The freelancer will be
+              notified. This cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <Button onClick={handleRefund} disabled={isRefunding}>
+                Yes, refund me
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setIsRefundModalOpen(false)}
+              >
+                Keep contract
+              </Button>
+            </div>
+          </Modal>
+
           {/* Deposit Status */}
           {isClient && contract?.deposits && contract.deposits.length > 0 && (
             <Card className={styles.depositsSection}>
@@ -854,6 +1172,25 @@ export default function ContractDetail() {
                       <p className={styles.milestoneApproved}>
                         ✓ Approved - Payment released to freelancer
                       </p>
+                    )}
+                    {canWithdrawMilestone(milestone) && (
+                      <>
+                        <p className={styles.walletWarning}>
+                          This milestone is marked paid on-chain, but no
+                          payout to you was recorded. You can withdraw the
+                          funds directly from escrow.
+                        </p>
+                        <Button
+                          variant="primary"
+                          className={styles.actionButton}
+                          onClick={() => handleWithdraw(milestone.id)}
+                          disabled={!connected || isWithdrawing[milestone.id]}
+                        >
+                          {isWithdrawing[milestone.id]
+                            ? "Processing..."
+                            : "Withdraw Payment"}
+                        </Button>
+                      </>
                     )}
                   </Card>
                 ))}
