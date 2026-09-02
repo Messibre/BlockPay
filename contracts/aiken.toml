@@ -1,8 +1,10 @@
-# dependencies removed to allow offline/local-only build
-# { name = "aiken/collection", version = ">=1.0.0", source = "github" },
-# { name = "aiken/cardano", version = ">=1.0.0", source = "github" },
-# { name = "sian_lab/vodka", version = ">=1.0.0", source = "github" },
 name = "messi/cardano-escrow"
 version = "0.1.0"
+compiler = "v1.1.19"
+plutus = "v3"
 description = "Escrow validator for Cardano freelance payments"
 
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "v2.2.0"
+source = "github"
