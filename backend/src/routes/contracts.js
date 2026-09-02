@@ -11,6 +11,8 @@ router.get('/:id/deposit/status', authenticate, contractController.verifyDeposit
 router.get('/:id/deposits', authenticate, contractController.getDeposits);
 router.post('/:id/milestones/:milestoneId/approve', authenticate, contractController.approveMilestone);
 router.post('/:id/milestones/:milestoneId/submit', authenticate, contractController.submitMilestone);
+router.post('/:id/milestones/:milestoneId/withdraw', authenticate, contractController.withdrawMilestone);
+router.post('/:id/refund', authenticate, contractController.refundContract);
 router.get('/', authenticate, contractController.getMyContracts);
 
 export default router;

@@ -102,10 +102,16 @@ export default {
     api
       .post(`/contracts/${contractId}/milestones/${milestoneId}/submit`, data)
       .then((res) => res.data),
-  withdrawContract: (contractId, data) =>
-    api.post(`/contracts/${contractId}/withdraw`, data).then((res) => res.data),
-  refundContract: (contractId, data) =>
-    api.post(`/contracts/${contractId}/refund`, data).then((res) => res.data),
+  withdrawMilestone: (contractId, milestoneId, txHash) =>
+    api
+      .post(`/contracts/${contractId}/milestones/${milestoneId}/withdraw`, {
+        txHash,
+      })
+      .then((res) => res.data),
+  refundContract: (contractId, txHash) =>
+    api
+      .post(`/contracts/${contractId}/refund`, { txHash })
+      .then((res) => res.data),
 
   // Utils
   getTxStatus: (txHash) => api.get(`/utils/tx/${txHash}`).then((res) => res.data),

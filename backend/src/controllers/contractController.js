@@ -129,9 +129,17 @@ export const getContract = async (req, res, next) => {
       paymentType: 'deposit',
     }).sort({ createdAt: -1 });
 
+    // Releases/payouts/refunds let the UI decide which recovery actions
+    // (Withdraw/Refund) are actually applicable.
+    const releases = await Payment.find({
+      contractId: contract._id,
+      paymentType: { $in: ['release', 'payout', 'refund'] },
+    }).sort({ createdAt: -1 });
+
     res.json({
       ...contract.toObject(),
       deposits,
+      releases,
     });
   } catch (error) {
     next(error);
@@ -586,6 +594,231 @@ export const submitMilestone = async (req, res, next) => {
         status: milestone.status,
         submittedAt: milestone.submittedAt,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Record a refund: the client reclaimed the escrow's remaining funds on-chain
+ * (Refund redeemer). Verifies the tx pays the client before marking the
+ * contract CANCELLED.
+ */
+export const refundContract = async (req, res, next) => {
+  try {
+    const { txHash } = req.body;
+    const contractId = req.params.id;
+
+    if (!txHash) {
+      return res.status(400).json({ message: 'txHash is required' });
+    }
+
+    const contract = await Contract.findById(contractId);
+    if (!contract) {
+      return res.status(404).json({ message: 'Contract not found' });
+    }
+
+    // Only the client can refund
+    if (contract.clientId.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Only the client can request a refund' });
+    }
+
+    if (contract.offchainState === 'CANCELLED') {
+      return res.status(409).json({ message: 'Contract is already cancelled/refunded' });
+    }
+
+    // Idempotency: same tx already recorded
+    const existing = await Payment.findOne({ txHash });
+    if (existing) {
+      return res.status(409).json({ message: 'Transaction already recorded' });
+    }
+
+    // Business rule mirror of the validator: refund is allowed when no
+    // milestone is paid, or after expiration when some are paid.
+    const paidLovelace = (contract.datum?.milestones || [])
+      .filter((m) => m.paid)
+      .reduce((sum, m) => sum + Number(m.amount), 0);
+    if (paidLovelace > 0) {
+      const exp = contract.datum?.expiration
+        ? new Date(contract.datum.expiration).getTime()
+        : null;
+      if (!exp || Date.now() <= exp) {
+        return res.status(422).json({
+          message:
+            'Refund not allowed: milestones have been paid and the contract has not expired.',
+        });
+      }
+    }
+
+    // Expected refund = total minus already-paid milestones (in lovelace)
+    const expectedRefundLovelace = Number(contract.totalAmount) - paidLovelace;
+    const clientAddress = contract.datum?.client;
+    if (!clientAddress) {
+      return res.status(422).json({ message: 'Contract datum has no client address' });
+    }
+
+    const verification = await verifyPayout(txHash, clientAddress, expectedRefundLovelace);
+    if (!verification.valid) {
+      return res.status(verification.status === 'PENDING' ? 202 : 422).json({
+        message: `Refund verification failed: ${verification.error}`,
+        status: verification.status || 'FAILED',
+      });
+    }
+
+    const refundAda = expectedRefundLovelace / 1_000_000;
+    const payment = new Payment({
+      contractId,
+      paymentType: 'refund',
+      amountADA: refundAda,
+      txHash,
+      status: 'CONFIRMED',
+      blockTime: verification.blockTime,
+      blockHeight: verification.blockHeight,
+      explorerLink: verification.explorerLink,
+      fromAddress: contract.contractAddress,
+      toAddress: clientAddress,
+    });
+    await payment.save();
+
+    contract.offchainState = 'CANCELLED';
+    if (contract.datum) contract.datum.status = 'refunded';
+    await contract.save();
+
+    await createNotification({
+      recipientId: contract.freelancerId,
+      type: 'system',
+      title: 'Contract Refunded',
+      message: `The client has cancelled the contract and reclaimed ${refundAda} ADA from escrow.`,
+      relatedId: contract._id,
+    });
+
+    res.json({
+      message: 'Refund recorded successfully',
+      offchainState: contract.offchainState,
+      amountADA: refundAda,
+      txHash,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Record a freelancer withdrawal (Withdraw redeemer) - the RECOVERY path for
+ * a milestone the on-chain datum marks paid but whose release payout never
+ * reached the freelancer. Rejects when a confirmed release/payout already
+ * exists for the milestone (the normal flow pays directly).
+ */
+export const withdrawMilestone = async (req, res, next) => {
+  try {
+    const { milestoneId } = req.params;
+    const { txHash } = req.body;
+    const contractId = req.params.id;
+
+    if (!txHash) {
+      return res.status(400).json({ message: 'txHash is required' });
+    }
+
+    const contract = await Contract.findById(contractId).populate(
+      'freelancerId',
+      'walletAddress wallets',
+    );
+    if (!contract) {
+      return res.status(404).json({ message: 'Contract not found' });
+    }
+
+    // Only the freelancer can withdraw
+    if (contract.freelancerId._id.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Only the freelancer can withdraw' });
+    }
+
+    const milestone = contract.milestones.find((m) => m.id === milestoneId);
+    if (!milestone) {
+      return res.status(404).json({ message: 'Milestone not found' });
+    }
+
+    // The on-chain datum must mark the milestone paid (validator requirement)
+    const datumMilestone = (contract.datum?.milestones || []).find(
+      (m) => m.id === milestoneId,
+    );
+    if (!datumMilestone?.paid) {
+      return res.status(422).json({
+        message: 'Milestone is not marked paid on-chain - it must be released first.',
+      });
+    }
+
+    // Guard: the normal Release flow already paid the freelancer directly.
+    // Withdraw is ONLY for recovery when no confirmed payout exists.
+    const existingPayout = await Payment.findOne({
+      contractId,
+      milestoneId,
+      paymentType: { $in: ['release', 'payout'] },
+      status: 'CONFIRMED',
+    });
+    if (existingPayout) {
+      return res.status(409).json({
+        message: `Milestone was already paid out in tx ${existingPayout.txHash}`,
+      });
+    }
+
+    const existing = await Payment.findOne({ txHash });
+    if (existing) {
+      return res.status(409).json({ message: 'Transaction already recorded' });
+    }
+
+    // Same fee math as release (fee only carved out above min-UTxO)
+    const milestoneLovelace = Number(milestone.amount);
+    const feePercent = contract.datum?.feePercent || 100;
+    const feeLovelace = Math.floor((milestoneLovelace * feePercent) / 10000);
+    const payoutLovelace = milestoneLovelace - feeLovelace;
+
+    const freelancerAddress =
+      contract.datum?.freelancer || contract.freelancerId?.walletAddress;
+    if (!freelancerAddress) {
+      return res.status(422).json({ message: 'No freelancer address on contract' });
+    }
+
+    const verification = await verifyPayout(txHash, freelancerAddress, payoutLovelace);
+    if (!verification.valid) {
+      return res.status(verification.status === 'PENDING' ? 202 : 422).json({
+        message: `Withdrawal verification failed: ${verification.error}`,
+        status: verification.status || 'FAILED',
+      });
+    }
+
+    const payoutAda = payoutLovelace / 1_000_000;
+    const payment = new Payment({
+      contractId,
+      milestoneId,
+      paymentType: 'payout',
+      amountADA: payoutAda,
+      txHash,
+      status: 'CONFIRMED',
+      blockTime: verification.blockTime,
+      blockHeight: verification.blockHeight,
+      explorerLink: verification.explorerLink,
+      fromAddress: contract.contractAddress,
+      toAddress: freelancerAddress,
+    });
+    await payment.save();
+
+    milestone.status = 'paid';
+    await contract.save();
+
+    await createNotification({
+      recipientId: contract.clientId,
+      type: 'payment_received',
+      title: 'Milestone Withdrawn',
+      message: `The freelancer withdrew ${payoutAda} ADA for milestone "${milestone.title}".`,
+      relatedId: contract._id,
+    });
+
+    res.json({
+      message: 'Withdrawal recorded successfully',
+      milestone: { id: milestone.id, status: milestone.status },
+      amountADA: payoutAda,
+      txHash,
     });
   } catch (error) {
     next(error);
