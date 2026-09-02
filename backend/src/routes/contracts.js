@@ -7,6 +7,7 @@ const router = express.Router();
 router.post('/', authenticate, contractController.createContract);
 router.get('/:id', authenticate, contractController.getContract);
 router.post('/:id/deposit', authenticate, contractController.recordDeposit);
+router.get('/:id/deposit/status', authenticate, contractController.verifyDepositStatus);
 router.get('/:id/deposits', authenticate, contractController.getDeposits);
 router.post('/:id/milestones/:milestoneId/approve', authenticate, contractController.approveMilestone);
 router.post('/:id/milestones/:milestoneId/submit', authenticate, contractController.submitMilestone);

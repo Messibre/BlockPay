@@ -74,6 +74,8 @@ export default {
       .then((res) => res.data),
   getDeposits: (id) =>
     api.get(`/contracts/${id}/deposits`).then((res) => res.data),
+  verifyDepositStatus: (id) =>
+    api.get(`/contracts/${id}/deposit/status`).then((res) => res.data),
 
   // Proposals
   submitProposal: (jobId, data) =>

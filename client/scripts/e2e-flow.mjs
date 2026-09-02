@@ -221,7 +221,42 @@ async function main() {
     });
     log("recordDeposit ->", recorded.status, JSON.stringify(recorded.json).slice(0, 200));
 
+    // NEW BEHAVIOR: recordDeposit must NOT flip the contract to FUNDED while
+    // the tx is unconfirmed. Assert it stays PENDING.
+    const preConfirm = await apiCall(`/contracts/${contractId}`, {
+      token: clientToken,
+    });
+    const stateBeforeConfirm = preConfirm.json.offchainState;
+    log("offchainState before confirmation:", stateBeforeConfirm);
+    if (stateBeforeConfirm === "FUNDED") {
+      throw new Error(
+        "BUG: contract flipped to FUNDED before on-chain confirmation!",
+      );
+    }
+
     await waitForTx(depositTxHash, "DEPOSIT");
+
+    // Poll the new verification endpoint (what the UI does every 15s).
+    log("polling /deposit/status until backend confirms the deposit...");
+    let funded = false;
+    for (let i = 0; i < 12; i++) {
+      const statusRes = await apiCall(`/contracts/${contractId}/deposit/status`, {
+        token: clientToken,
+      });
+      log(
+        `deposit/status -> state=${statusRes.json.offchainState}, deposits=` +
+          JSON.stringify(
+            (statusRes.json.deposits || []).map((d) => d.status),
+          ),
+      );
+      if (statusRes.json.offchainState === "FUNDED") {
+        funded = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 10000));
+    }
+    if (!funded) throw new Error("deposit/status never flipped to FUNDED!");
+    log("contract is FUNDED (verified on-chain)");
   }
 
   // ---------- 4. Release milestone ms-001 (mirrors handleApproveMilestone) ----------
