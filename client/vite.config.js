@@ -183,6 +183,10 @@ export default defineConfig({
     },
     // Rollup options for better CommonJS handling
     rollupOptions: {
+      // @meshsdk/core-csl is a Node-only WASM package used by test scripts
+      // (local Aiken-VM tx evaluation). It cannot be bundled for the browser;
+      // the app lazily imports it and falls back to the Blockfrost evaluator.
+      external: ["@meshsdk/core-csl"],
       output: {
         // Ensure proper format
         format: "es",

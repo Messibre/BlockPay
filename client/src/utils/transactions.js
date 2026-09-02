@@ -5,8 +5,23 @@ import {
   resolveDataHash,
   BlockfrostProvider,
 } from "@meshsdk/core";
-import { OfflineEvaluator } from "@meshsdk/core-csl";
 import { contractScript } from "../constants/script";
+
+// Optionally load the local Aiken-VM evaluator (@meshsdk/core-csl). It is a
+// WASM package that Vite cannot bundle for the browser, so it is imported
+// lazily with @vite-ignore: available in Node (tests/scripts), and silently
+// falling back to the Blockfrost evaluator in the browser build.
+const getEvaluator = async (provider, network) => {
+  try {
+    const mod = await import(/* @vite-ignore */ "@meshsdk/core-csl");
+    if (mod?.OfflineEvaluator) {
+      return new mod.OfflineEvaluator(provider, network);
+    }
+  } catch {
+    /* core-csl unavailable in this environment; use remote evaluator */
+  }
+  return provider;
+};
 
 // Resolve the Blockfrost key in both Vite (import.meta.env) and Node
 // (process.env) so the same code path can be exercised by tests/scripts.
@@ -18,8 +33,8 @@ const getBlockfrostKey = () => {
   } catch {
     /* not running under Vite */
   }
-  if (typeof process !== "undefined" && process.env?.VITE_BLOCKFROST_KEY) {
-    return process.env.VITE_BLOCKFROST_KEY;
+  if (globalThis.process?.env?.VITE_BLOCKFROST_KEY) {
+    return globalThis.process.env.VITE_BLOCKFROST_KEY;
   }
   return undefined;
 };
@@ -290,13 +305,12 @@ export const buildReleaseTransaction = async (
     contractScript.cbor.slice(0, 20) + "...",
   );
   // Initialize MeshTxBuilder.
-  // IMPORTANT: use the LOCAL OfflineEvaluator (real Aiken VM) instead of
-  // Blockfrost's remote Ogmios evaluator. Blockfrost's evaluator fails on
-  // Plutus V3 spends with an unhelpful empty "ScriptFailures: {}" even for
-  // valid transactions, and gives no error detail when a script does fail.
+  // Prefer the LOCAL OfflineEvaluator (real Aiken VM, precise error messages)
+  // when available (Node scripts/tests); fall back to Blockfrost's remote
+  // evaluator in the browser where the WASM evaluator cannot be bundled.
   const blockfrostProvider = new BlockfrostProvider(getBlockfrostKey());
   const network =
-    (typeof process !== "undefined" && process.env?.VITE_NETWORK) ||
+    globalThis.process?.env?.VITE_NETWORK ||
     (() => {
       try {
         return import.meta.env?.VITE_NETWORK;
@@ -305,11 +319,11 @@ export const buildReleaseTransaction = async (
       }
     })() ||
     "preprod";
-  const offlineEvaluator = new OfflineEvaluator(blockfrostProvider, network);
+  const evaluator = await getEvaluator(blockfrostProvider, network);
 
   const txBuilder = new MeshTxBuilder({
     fetcher: blockfrostProvider,
-    evaluator: offlineEvaluator,
+    evaluator,
     verbose: false,
   }); // Manually fetch and provide UTXOs to the builder
 
