@@ -4,7 +4,6 @@ import {
   resolvePlutusScriptAddress,
   resolveDataHash,
   BlockfrostProvider,
-  serializeData,
 } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 
@@ -22,10 +21,10 @@ export const adaToLovelace = (ada) => {
 export const createRedeemerData = {
   // Aiken: Deposit -> Constr 0 []
   deposit: () => {
-    return serializeData({
+    return {
       alternative: 0,
       fields: [],
-    });
+    };
   }, // Aiken: Release(ByteArray) -> Constr 1 [ByteArray milestoneId]
 
   release: (milestoneId) => {
@@ -38,10 +37,10 @@ export const createRedeemerData = {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    return serializeData({
+    return {
       alternative: 1,
       fields: [hex],
-    });
+    };
   }, // Aiken: Withdraw(ByteArray) -> Constr 2 [ByteArray milestoneId]
 
   withdraw: (milestoneId) => {
@@ -54,7 +53,7 @@ export const createRedeemerData = {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    return serializeData({
+    return {
       alternative: 2,
       fields: [
         {
@@ -62,14 +61,14 @@ export const createRedeemerData = {
           fields: [hex],
         },
       ],
-    });
+    };
   }, // Aiken: Refund -> Constr 3 []
 
   refund: () => {
-    return serializeData({
+    return {
       alternative: 3,
       fields: [],
-    });
+    };
   }, // Aiken: Arbitrate(ArbitrateDecision) -> Constr 4 [ArbitrateDecision]
 
   arbitrate: (decision) => {
@@ -82,7 +81,7 @@ export const createRedeemerData = {
     const decisionIndex =
       typeof decision === "string" ? decisionMap[decision] : decision;
 
-    return serializeData({
+    return {
       alternative: 4,
       fields: [
         {
@@ -90,7 +89,7 @@ export const createRedeemerData = {
           fields: [],
         },
       ],
-    });
+    };
   },
 };
 
@@ -220,13 +219,12 @@ export const buildDepositTransaction = async (
     );
   }
 
-  const meshDatum = toMeshDatum(normalizedDatum);
-  const meshDatumData = serializeData(meshDatum); // Output: Contract deposit with inline datum
+  const meshDatum = toMeshDatum(normalizedDatum); // Output: Contract deposit with inline datum
 
   txBuilder.txOut(contractAddress, [
     { unit: "lovelace", quantity: amount.toString() },
   ]);
-  txBuilder.txOutInlineDatumValue(meshDatumData); // Set change address
+  txBuilder.txOutInlineDatumValue(meshDatum); // Set change address
 
   txBuilder.changeAddress(changeAddress);
 
