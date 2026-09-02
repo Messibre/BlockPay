@@ -359,6 +359,62 @@ export const buildReleaseTransaction = async (
   return txHash;
 };
 
+// Helper: Find the escrow UTxO belonging to THIS contract by inspecting
+// each UTxO's inline datum CBOR. The correct UTxO's datum must contain the
+// hex-encoded milestone id AND the client's payment key hash. This prevents
+// spending an unrelated UTxO at the shared script address (there can be many
+// contracts' deposits at the same address), which makes the validator fail.
+export const findEscrowUtxo = (utxos, { milestoneId, clientAddress } = {}) => {
+  if (!utxos || utxos.length === 0) return null;
+
+  const toHex = (s) =>
+    Array.from(new TextEncoder().encode(String(s)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+  const milestoneHex = milestoneId ? toHex(milestoneId).toLowerCase() : null;
+
+  let clientHash = null;
+  try {
+    clientHash = clientAddress
+      ? resolvePaymentKeyHash(clientAddress).toLowerCase()
+      : null;
+  } catch {
+    clientHash = null;
+  }
+
+  const inlineDatumOf = (u) =>
+    u?.output?.plutusData ||
+    u?.plutusData ||
+    u?.inline_datum ||
+    (typeof u?.datum === "string" && u.datum.length > 64 ? u.datum : null) ||
+    "";
+
+  const matches = utxos.filter((u) => {
+    const inline = String(inlineDatumOf(u)).toLowerCase();
+    if (!inline) return false;
+    const milestoneOk = milestoneHex ? inline.includes(milestoneHex) : true;
+    const clientOk = clientHash ? inline.includes(clientHash) : true;
+    return milestoneOk && clientOk;
+  });
+
+  // Prefer the largest matching UTxO (the funded escrow, not dust)
+  if (matches.length > 1) {
+    matches.sort((a, b) => {
+      const lovelace = (u) => {
+        const amt = u?.output?.amount || u?.amount || [];
+        const l = Array.isArray(amt)
+          ? amt.find((x) => x.unit === "lovelace")
+          : null;
+        return l ? Number(l.quantity) : 0;
+      };
+      return lovelace(b) - lovelace(a);
+    });
+  }
+
+  return matches[0] || null;
+};
+
 // Helper: Find UTxO matching the contract datum
 export const findMatchingUtxo = (utxos, contractDatum) => {
   if (!utxos || utxos.length === 0) return null;

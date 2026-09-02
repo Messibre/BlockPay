@@ -17,7 +17,7 @@ import {
   buildDepositTransaction,
   buildReleaseTransaction,
   lovelaceToAda,
-  findMatchingUtxo,
+  findEscrowUtxo,
 } from "../utils/transactions.js";
 import { BlockfrostProvider } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
@@ -417,12 +417,21 @@ export default function ContractDetail() {
         );
       }
 
-      // 3. Use the first UTXO
-      const rawUtxo = onChainUtxos[0];
+      // 3. Find the UTXO that belongs to THIS contract (match by inline
+      // datum content: milestone id + client key hash). NEVER take the first
+      // UTXO blindly - the script address holds deposits from many contracts.
+      const rawUtxo = findEscrowUtxo(onChainUtxos, {
+        milestoneId,
+        clientAddress: clientAddr,
+      });
 
-      // ... Now your existing 'formattedUtxo' logic below this will work!
       if (!rawUtxo) {
-        throw new Error("Contract UTxO not found. Has it been deposited?");
+        throw new Error(
+          `No escrow UTXO for this contract found at ${scriptAddress}. ` +
+            `The deposit may not be confirmed yet, or it was made with an ` +
+            `older (incompatible) datum format - in that case create a new ` +
+            `contract and deposit again.`,
+        );
       }
 
       const formattedUtxo = {
