@@ -7,6 +7,22 @@ import {
 } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 
+// Resolve the Blockfrost key in both Vite (import.meta.env) and Node
+// (process.env) so the same code path can be exercised by tests/scripts.
+const getBlockfrostKey = () => {
+  try {
+    if (import.meta.env && import.meta.env.VITE_BLOCKFROST_KEY) {
+      return import.meta.env.VITE_BLOCKFROST_KEY;
+    }
+  } catch {
+    /* not running under Vite */
+  }
+  if (typeof process !== "undefined" && process.env?.VITE_BLOCKFROST_KEY) {
+    return process.env.VITE_BLOCKFROST_KEY;
+  }
+  return undefined;
+};
+
 // Constants;
 
 export const lovelaceToAda = (lovelace) => {
@@ -157,9 +173,7 @@ export const buildDepositTransaction = async (
   datum,
 ) => {
   // Initialize MeshTxBuilder
-  const blockfrostProvider = new BlockfrostProvider(
-    import.meta.env.VITE_BLOCKFROST_KEY,
-  );
+  const blockfrostProvider = new BlockfrostProvider(getBlockfrostKey());
   const txBuilder = new MeshTxBuilder({
     fetcher: blockfrostProvider,
     evaluator: blockfrostProvider,
@@ -275,9 +289,7 @@ export const buildReleaseTransaction = async (
     contractScript.cbor.slice(0, 20) + "...",
   );
   // Initialize MeshTxBuilder
-  const blockfrostProvider = new BlockfrostProvider(
-    import.meta.env.VITE_BLOCKFROST_KEY,
-  );
+  const blockfrostProvider = new BlockfrostProvider(getBlockfrostKey());
 
   const txBuilder = new MeshTxBuilder({
     fetcher: blockfrostProvider,
