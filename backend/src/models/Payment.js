@@ -15,7 +15,7 @@ const paymentSchema = new mongoose.Schema(
       required: true,
     },
     amountADA: {
-      type: Number, // lovelace
+      type: Number, // ADA (NOT lovelace - e.g. 3.96 means 3.96 ADA)
       required: true,
     },
     txHash: {

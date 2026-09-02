@@ -137,6 +137,7 @@ async function main() {
   const clientReg = await regOrLogin("client", seeds.client.address);
   const freelancerReg = await regOrLogin("freelancer", seeds.freelancer.address);
   const clientToken = clientReg.json.token;
+  const freelancerToken = freelancerReg.json.token;
   const freelancerId = freelancerReg.json.user.id;
   log("users ready:", clientReg.json.user.id, freelancerId);
 
@@ -324,12 +325,29 @@ async function main() {
 
   await waitForTx(releaseTxHash, "RELEASE");
 
-  // ---------- 5. Record approval with backend ----------
+  // ---------- 5. Submit milestone as freelancer, then record approval ----------
+  const submitted = await apiCall(
+    `/contracts/${contractId}/milestones/${milestoneId}/submit`,
+    { method: "POST", token: freelancerToken, body: { note: "e2e deliverable" } },
+  );
+  log("submitMilestone ->", submitted.status, JSON.stringify(submitted.json).slice(0, 150));
+  if (submitted.status !== 200) {
+    throw new Error(`submitMilestone failed with ${submitted.status}`);
+  }
+
   const approved = await apiCall(
     `/contracts/${contractId}/milestones/${milestoneId}/approve`,
     { method: "POST", token: clientToken, body: { txHash: releaseTxHash } },
   );
   log("approveMilestone ->", approved.status, JSON.stringify(approved.json).slice(0, 300));
+  // The approve endpoint verifies the payout on-chain (verifyPayout). Assert
+  // it accepted - a 4xx here means the DB/on-chain reconciliation is broken
+  // even though the funds moved (the bug behind the 422 units regression).
+  if (approved.status !== 200) {
+    throw new Error(
+      `approveMilestone failed with ${approved.status}: ${JSON.stringify(approved.json)}`,
+    );
+  }
 
   // ---------- 6. Verify freelancer payout on-chain ----------
   const fUtxos = await provider.fetchAddressUTxOs(seeds.freelancer.address);
