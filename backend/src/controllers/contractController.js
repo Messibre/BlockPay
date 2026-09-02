@@ -209,11 +209,18 @@ export const recordDeposit = async (req, res, next) => {
 
         await payment.save();
 
-        // Update contract state to FUNDED so UI reflects the deposit immediately
-        contract.offchainState = 'FUNDED';
-        await contract.save();
-
-        return res.json({ status: payment.status, txHash, explorerLink: payment.explorerLink });
+        // IMPORTANT: do NOT mark the contract FUNDED yet. The transaction has
+        // not been observed on-chain (wallets can submit txs that never
+        // confirm). The contract stays PENDING; the client polls
+        // GET /contracts/:id/deposit/status which flips it to FUNDED only
+        // once the deposit is verified on-chain.
+        return res.json({
+          status: payment.status,
+          txHash,
+          explorerLink: payment.explorerLink,
+          message:
+            'Deposit submitted but not yet confirmed on-chain. The contract will become FUNDED once the transaction is verified.',
+        });
       }
 
       // Otherwise return a validation error with details (amount mismatch, etc.)
@@ -275,6 +282,78 @@ export const recordDeposit = async (req, res, next) => {
       status: payment.status,
       txHash,
       explorerLink: payment.explorerLink,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Re-verify PENDING deposits against the chain. Flips the contract to FUNDED
+ * only when a deposit is actually confirmed on-chain. Deposits that are still
+ * unknown to the chain after 30 minutes are marked FAILED so the client can
+ * safely deposit again.
+ */
+export const verifyDepositStatus = async (req, res, next) => {
+  try {
+    const contract = await Contract.findById(req.params.id);
+    if (!contract) {
+      return res.status(404).json({ message: 'Contract not found' });
+    }
+
+    const pending = await Payment.find({
+      contractId: contract._id,
+      paymentType: 'deposit',
+      status: 'PENDING',
+    });
+
+    const STALE_MS = 30 * 60 * 1000;
+    let confirmedAny = false;
+
+    for (const payment of pending) {
+      const expectedLovelace = Math.round(Number(payment.amountADA) * 1_000_000);
+      const verification = await verifyDeposit(
+        payment.txHash,
+        contract.contractAddress,
+        expectedLovelace,
+      );
+
+      if (verification.valid) {
+        payment.status = 'CONFIRMED';
+        payment.blockTime = verification.blockTime;
+        payment.blockHeight = verification.blockHeight;
+        await payment.save();
+        confirmedAny = true;
+      } else if (
+        verification.status === 'PENDING' &&
+        Date.now() - new Date(payment.createdAt).getTime() > STALE_MS
+      ) {
+        // Tx never reached the chain (dropped/rejected at submission).
+        payment.status = 'FAILED';
+        await payment.save();
+      }
+    }
+
+    if (confirmedAny && contract.offchainState === 'PENDING') {
+      contract.offchainState = 'FUNDED';
+      await contract.save();
+      await createNotification({
+        recipientId: contract.clientId,
+        type: 'system',
+        title: 'Deposit Confirmed',
+        message: `Your deposit for contract ${contract._id} is confirmed on-chain.`,
+        relatedId: contract._id,
+      });
+    }
+
+    const deposits = await Payment.find({
+      contractId: contract._id,
+      paymentType: 'deposit',
+    }).sort({ createdAt: -1 });
+
+    res.json({
+      offchainState: contract.offchainState,
+      deposits,
     });
   } catch (error) {
     next(error);

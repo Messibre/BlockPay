@@ -52,6 +52,24 @@ export default function ContractDetail() {
     enabled: !!localStorage.getItem("token") || isAuthenticated,
   });
 
+  // While a deposit is PENDING on-chain, poll the backend which re-verifies
+  // it against Blockfrost and flips the contract to FUNDED once confirmed.
+  const hasPendingDeposit =
+    contract?.offchainState === "PENDING" &&
+    (contract?.deposits || []).some((d) => d.status === "PENDING");
+  useQuery({
+    queryKey: ["deposit-status", id],
+    queryFn: async () => {
+      const data = await api.verifyDepositStatus(id);
+      if (data.offchainState !== "PENDING") {
+        queryClient.invalidateQueries(["contract", id]);
+      }
+      return data;
+    },
+    enabled: hasPendingDeposit,
+    refetchInterval: 15000,
+  });
+
   if (isLoading) {
     return (
       <div className={styles.loadingContainer}>
@@ -84,9 +102,6 @@ export default function ContractDetail() {
   const isFunded =
     contract?.offchainState === "FUNDED" ||
     contract?.offchainState === "ACTIVE";
-
-  // Use contract-specific address if it looks valid, otherwise fall back to global configured script address
-  const isValidAddress = (a) => typeof a === "string" && a.length > 30;
 
   // Try to find address in this order:
   // 1. Contract object itself (if saved)
@@ -226,7 +241,9 @@ export default function ContractDetail() {
         signerSignature,
       );
 
-      success(`Deposit transaction submitted! TX: ${txHash.slice(0, 16)}...`);
+      success(
+        `Deposit submitted (TX: ${txHash.slice(0, 16)}...). Waiting for on-chain confirmation...`,
+      );
       queryClient.invalidateQueries(["contract", id]);
     } catch (error) {
       console.error("Deposit error:", error);
@@ -280,7 +297,6 @@ export default function ContractDetail() {
       const res = await api.verifyWallet(address, signature, message);
       // Update auth (token + user)
       const newToken = res.token;
-      const newUser = res.user;
       localStorage.setItem("token", newToken);
       // Force a page refresh of auth context by reloading (or call a login method if available)
       window.location.reload();
@@ -321,15 +337,6 @@ export default function ContractDetail() {
         throw new Error("No UTxOs found in contract script");
       }
 
-      // Prefer UTxO that matches the most recent confirmed deposit txHash
-      const deposits = contract?.deposits || [];
-      const confirmedDeposits = deposits.filter(
-        (d) => d.status === "CONFIRMED",
-      );
-      const latestDeposit = confirmedDeposits[0] || deposits[0] || null;
-      const preferredUtxo = latestDeposit
-        ? utxos.find((u) => u.txHash === latestDeposit.txHash)
-        : null;
       // Basic address validator
       const isBech32 = (s) =>
         typeof s === "string" &&
@@ -404,7 +411,7 @@ export default function ContractDetail() {
         // Try the most common Mesh fetcher method
         onChainUtxos =
           await blockfrostProvider.fetchAddressUTxOs(scriptAddress);
-      } catch (e) {
+      } catch {
         // Fallback for different Mesh versions
         onChainUtxos = await blockfrostProvider.fetchUtxos(scriptAddress);
       }
@@ -501,7 +508,7 @@ export default function ContractDetail() {
         "Failed to approve milestone";
       showError(msg);
       // Log full response for debugging
-      // eslint-disable-next-line no-console
+       
       console.error("Approve error response:", resp || error);
     } finally {
       setIsApproving({ ...isApproving, [milestoneId]: false });
@@ -595,26 +602,38 @@ export default function ContractDetail() {
           {needsDeposit && (
             <Card className={styles.depositSection}>
               <h2>Fund Escrow</h2>
-              <p className={styles.depositInfo}>
-                Deposit{" "}
-                <strong>{lovelaceToAda(contract.totalAmount)} ADA</strong> to
-                the escrow contract to lock funds.
-              </p>
-              {!connected && (
+              {hasPendingDeposit ? (
+                <p className={styles.depositInfo}>
+                  Your deposit has been submitted and is awaiting on-chain
+                  confirmation. This usually takes under a minute; this page
+                  will update automatically. If the transaction never
+                  confirms, it will be marked failed after 30 minutes and you
+                  can deposit again.
+                </p>
+              ) : (
+                <p className={styles.depositInfo}>
+                  Deposit{" "}
+                  <strong>{lovelaceToAda(contract.totalAmount)} ADA</strong> to
+                  the escrow contract to lock funds.
+                </p>
+              )}
+              {!connected && !hasPendingDeposit && (
                 <p className={styles.walletWarning}>
                   Please connect your wallet to deposit funds.
                 </p>
               )}
-              <Button
-                variant="primary"
-                onClick={handleDeposit}
-                disabled={!connected || isDepositing}
-                className={styles.depositButton}
-              >
-                {isDepositing
-                  ? "Processing..."
-                  : `Deposit ${lovelaceToAda(contract.totalAmount)} ADA`}
-              </Button>
+              {!hasPendingDeposit && (
+                <Button
+                  variant="primary"
+                  onClick={handleDeposit}
+                  disabled={!connected || isDepositing}
+                  className={styles.depositButton}
+                >
+                  {isDepositing
+                    ? "Processing..."
+                    : `Deposit ${lovelaceToAda(contract.totalAmount)} ADA`}
+                </Button>
+              )}
               {scriptAddress && (
                 <div className={styles.contractInfo}>
                   <p className={styles.smallText}>
