@@ -12,6 +12,19 @@ const generateContractAddress = () => {
   );
 };
 
+// Resolve a user's primary wallet address: prefer the wallets[] array
+// (primary first), fall back to the legacy walletAddress field.
+const resolvePrimaryAddress = (u) => {
+  if (!u) return null;
+  if (u.wallets && u.wallets.length > 0) {
+    const primary = u.wallets.find((w) => w.isPrimary);
+    if (primary && primary.address) return primary.address;
+    if (u.wallets[0].address) return u.wallets[0].address;
+  }
+  if (u.walletAddress) return u.walletAddress;
+  return null;
+};
+
 export const createContract = async (req, res, next) => {
   try {
     const { jobId, freelancerId, totalAmount, milestones, feePayer } = req.body;
@@ -34,17 +47,6 @@ export const createContract = async (req, res, next) => {
       User.findById(req.userId),
       User.findById(freelancerId),
     ]);
-
-    const resolvePrimaryAddress = (u) => {
-      if (!u) return null;
-      if (u.wallets && u.wallets.length > 0) {
-        const primary = u.wallets.find((w) => w.isPrimary);
-        if (primary && primary.address) return primary.address;
-        if (u.wallets[0].address) return u.wallets[0].address;
-      }
-      if (u.walletAddress) return u.walletAddress;
-      return null;
-    };
 
     const clientAddress = resolvePrimaryAddress(clientUser);
     const freelancerAddress = resolvePrimaryAddress(freelancerUser);
@@ -295,7 +297,10 @@ export const approveMilestone = async (req, res, next) => {
     const { txHash } = req.body;
     const contractId = req.params.id;
 
-    const contract = await Contract.findById(contractId).populate('freelancerId', 'walletAddress');
+    const contract = await Contract.findById(contractId).populate(
+      'freelancerId',
+      'walletAddress wallets',
+    );
 
     if (!contract) {
       console.warn(`Contract not found: ${contractId}`);
@@ -340,7 +345,13 @@ export const approveMilestone = async (req, res, next) => {
 
     // If txHash provided, verify the release transaction
     if (txHash) {
-      const freelancerAddress = contract.freelancerId.walletAddress;
+      const freelancerAddress =
+        resolvePrimaryAddress(contract.freelancerId) || contract.datum?.freelancer;
+      if (!freelancerAddress) {
+        return res.status(422).json({
+          message: 'Freelancer has no linked wallet address to verify the payout against',
+        });
+      }
       const milestoneAmount = milestone.amount;
       const feePercent = contract.datum.feePercent || 100;
       const feeAmount = Math.floor((milestoneAmount * feePercent) / 10000);

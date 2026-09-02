@@ -60,6 +60,7 @@ const contractSchema = new mongoose.Schema(
       totalAmount: Number,
       contractNonce: Number,
       feePercent: Number,
+      feeAddress: String,
       expiration: Date, // POSIXTime
       status: {
         type: String,

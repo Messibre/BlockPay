@@ -291,16 +291,45 @@ export const buildReleaseTransaction = async (
   console.log("cleaned", cleanUtxos);
   txBuilder.selectUtxosFrom(cleanUtxos); // Set Collateral (Required for Plutus V3 transactions)
 
+  // Collateral is MANDATORY for Plutus script spends. Without it the tx body
+  // has no collateral field and Ogmios/Blockfrost evaluation fails with an
+  // empty "ScriptFailures: {}" error. Eternl returns [] from getCollateral()
+  // unless the user reserved collateral in wallet settings, so fall back to
+  // a pure-ADA wallet UTXO (>= 5 ADA, no native tokens).
   const collateralUtxos = await wallet.getCollateral();
-  if (collateralUtxos && collateralUtxos.length > 0) {
-    const collateral = collateralUtxos[0];
-    txBuilder.txInCollateral(
-      collateral.input.txHash,
-      collateral.input.outputIndex,
-      collateral.output.amount,
-      collateral.output.address,
+  let collateral = collateralUtxos && collateralUtxos[0];
+
+  if (!collateral) {
+    collateral = cleanUtxos.find((u) => {
+      const amt = u?.output?.amount || [];
+      return (
+        amt.length === 1 &&
+        amt[0].unit === "lovelace" &&
+        Number(amt[0].quantity) >= 5_000_000
+      );
+    });
+    if (collateral) {
+      console.log(
+        "ℹ️ Wallet has no reserved collateral; using a pure-ADA UTXO as collateral:",
+        collateral.input.txHash + "#" + collateral.input.outputIndex,
+      );
+    }
+  }
+
+  if (!collateral) {
+    throw new Error(
+      "No collateral available. Enable/reserve collateral in your wallet " +
+        "settings (Eternl: Wallet > Collateral), or keep a pure-ADA UTXO of " +
+        "at least 5 ADA in your wallet, then try again.",
     );
-  } // Add client as required signer
+  }
+
+  txBuilder.txInCollateral(
+    collateral.input.txHash,
+    collateral.input.outputIndex,
+    collateral.output.amount,
+    collateral.output.address,
+  ); // Add client as required signer
 
   const isBech32 = (s) =>
     typeof s === "string" &&
@@ -334,10 +363,18 @@ export const buildReleaseTransaction = async (
     { unit: "lovelace", quantity: payoutAmount.toString() },
   ]); // Output 2: Platform fee (if applicable)
 
-  if (feeAddress && feeAmount > 0) {
+  // Cardano requires every output to hold ~1 ADA minimum (min-UTXO rule).
+  // A tiny platform fee (e.g. 0.03 ADA on a 3 ADA milestone) would make the
+  // tx unsubmittable, so only add the fee output when it clears the minimum.
+  const MIN_UTXO_LOVELACE = 1_000_000;
+  if (feeAddress && feeAmount >= MIN_UTXO_LOVELACE) {
     txBuilder.txOut(feeAddress, [
       { unit: "lovelace", quantity: feeAmount.toString() },
     ]);
+  } else if (feeAddress && feeAmount > 0) {
+    console.log(
+      `ℹ️ Skipping platform fee output of ${feeAmount} lovelace (below min-UTXO); fee stays with change.`,
+    );
   } // Output 3: Remaining funds back to script
 
   if (remainingAmount > 0) {
