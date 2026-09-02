@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@harmoniclabs/uplc": "^2.0.7",
-    "@meshsdk/common": "^1.9.0-beta.90",
-    "@meshsdk/core": "^1.9.0-beta.87",
+    "@meshsdk/common": "^1.9.1",
+    "@meshsdk/core": "^1.9.1",
     "@meshsdk/core-csl": "^1.9.1",
-    "@meshsdk/react": "^1.9.0-beta.87",
+    "@meshsdk/react": "^1.9.0-beta.98",
     "@tanstack/react-query": "^5.90.12",
     "axios": "^1.13.2",
     "react": "^19.2.0",

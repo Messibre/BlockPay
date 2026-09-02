@@ -153,6 +153,20 @@ async function main() {
   );
   const verdict = await res.json();
   log("OGMIOS VERDICT:", JSON.stringify(verdict, null, 1).slice(0, 2000));
+
+  // THE REAL ANSWER: local Aiken VM evaluation with full error + logs
+  const { OfflineEvaluator } = await import("@meshsdk/core-csl");
+  const evaluator = new OfflineEvaluator(provider, "preprod");
+  try {
+    const budgets = await evaluator.evaluateTx(signedTx, [], []);
+    log("LOCAL EVAL SUCCESS! budgets:", JSON.stringify(budgets));
+  } catch (e) {
+    log("LOCAL EVAL ERROR (FULL):");
+    const msg = typeof e === "string" ? e : e?.message || JSON.stringify(e);
+    fs.writeFileSync("/tmp/eval-error.txt", msg);
+    console.log(msg);
+    if (e?.logs) console.log("logs:", e.logs);
+  }
 }
 
 main().catch((e) => {
