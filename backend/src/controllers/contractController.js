@@ -196,7 +196,11 @@ export const recordDeposit = async (req, res, next) => {
         const payment = new Payment({
           contractId,
           paymentType: 'deposit',
-          amountADA: verification.amount || Math.round(expectedLovelace) / 1_000_000,
+          // amountADA is ALWAYS stored in ADA. verification.amount is in
+          // lovelace (raw Blockfrost quantity), so convert before storing.
+          amountADA: verification.amount
+            ? verification.amount / 1_000_000
+            : expectedLovelace / 1_000_000,
           txHash,
           status: 'PENDING',
           blockTime: verification.blockTime || null,
@@ -251,7 +255,8 @@ export const recordDeposit = async (req, res, next) => {
     const payment = new Payment({
       contractId,
       paymentType: 'deposit',
-      amountADA: verification.amount,
+      // verification.amount is lovelace; amountADA stores ADA
+      amountADA: verification.amount / 1_000_000,
       txHash,
       status: verification.status || 'CONFIRMED',
       blockTime: verification.blockTime,

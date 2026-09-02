@@ -205,6 +205,16 @@ export default function ContractDetail() {
           ? address
           : null;
 
+      // The contract nonce MUST be the backend-stored value: the release flow
+      // rebuilds this exact datum from contract.datum.contractNonce, and any
+      // difference makes the on-chain datum unmatchable (funds unreachable).
+      if (!contract.datum?.contractNonce) {
+        throw new Error(
+          "Contract is missing its on-chain nonce (datum.contractNonce). " +
+            "Cannot deposit safely - contact support.",
+        );
+      }
+
       // Build the escrow datum
       const datum = {
         client: clientAddr,
@@ -217,7 +227,7 @@ export default function ContractDetail() {
             amount: m.amount,
             paid: false,
           })),
-        contract_nonce: contract.datum?.contractNonce || Date.now(),
+        contract_nonce: contract.datum.contractNonce,
         fee_percent: contract.datum?.feePercent || 100, // Default 1% (100 basis points)
         fee_address: feeAddr,
         expiration: contract.datum?.expiration || null,
@@ -396,12 +406,20 @@ export default function ContractDetail() {
             amount: m.amount,
             paid: m.status === "approved" || m.status === "paid",
           })),
-        contract_nonce: contract.datum?.contractNonce || Date.now(),
+        contract_nonce: contract.datum?.contractNonce,
         fee_percent: contract.datum?.feePercent || 100,
         fee_address: feeAddr || clientAddr, // Fallback to client if fee addr missing
         expiration: contract.datum?.expiration || null,
         arbitrator: arbitratorAddr || clientAddr, // Fallback
       };
+
+      // The nonce must byte-match the on-chain datum; a made-up fallback
+      // would silently produce an unspendable rebuild.
+      if (!currentDatum.contract_nonce) {
+        throw new Error(
+          "Contract is missing its on-chain nonce (datum.contractNonce) - cannot rebuild the escrow datum.",
+        );
+      }
 
       // Validate critical addresses
       if (!isBech32(currentDatum.client)) {

@@ -47,14 +47,12 @@ export const getDashboardStats = async (req, res, next) => {
 
     const totalPaid = layoutStats.length > 0 ? layoutStats[0].totalPaid : 0;
 
-    // Convert Lovelace to ADA (1 ADA = 1,000,000 Lovelace) for display
-    const totalPaidADA = totalPaid / 1000000;
-
+    // Payment.amountADA is stored in ADA (not lovelace) - no conversion needed
     res.json({
       activeJobs,
       pendingContracts,
       completedContracts,
-      totalPaid: totalPaidADA,
+      totalPaid,
     });
   } catch (error) {
     next(error);

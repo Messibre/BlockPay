@@ -85,14 +85,11 @@ export const createRedeemerData = {
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
+    // Aiken: Withdraw(ByteArray) -> Constr 2 [ByteArray] (the milestone id is
+    // a bare ByteArray field, NOT wrapped in another constructor)
     return {
       alternative: 2,
-      fields: [
-        {
-          alternative: 0,
-          fields: [hex],
-        },
-      ],
+      fields: [hex],
     };
   }, // Aiken: Refund -> Constr 3 []
 
@@ -103,7 +100,10 @@ export const createRedeemerData = {
     };
   }, // Aiken: Arbitrate(ArbitrateDecision) -> Constr 4 [ArbitrateDecision]
 
-  arbitrate: (decision) => {
+  // Aiken: Arbitrate(ArbitrateDecision) -> Constr 4 [decision]
+  // PayFull -> Constr 0 [], PayPartial(Int) -> Constr 1 [amount],
+  // RefundFull -> Constr 2 [], RefundPartial(Int) -> Constr 3 [amount]
+  arbitrate: (decision, partialAmountLovelace) => {
     const decisionMap = {
       PayFull: 0,
       PayPartial: 1,
@@ -113,12 +113,20 @@ export const createRedeemerData = {
     const decisionIndex =
       typeof decision === "string" ? decisionMap[decision] : decision;
 
+    // Partial decisions carry an Int (lovelace) field in the validator
+    const isPartial = decisionIndex === 1 || decisionIndex === 3;
+    if (isPartial && partialAmountLovelace == null) {
+      throw new Error(
+        "PayPartial/RefundPartial require a partial amount in lovelace",
+      );
+    }
+
     return {
       alternative: 4,
       fields: [
         {
           alternative: decisionIndex,
-          fields: [],
+          fields: isPartial ? [BigInt(partialAmountLovelace)] : [],
         },
       ],
     };
@@ -174,8 +182,20 @@ const toMeshDatum = (d) => {
       BigInt(d.contract_nonce),
       BigInt(d.fee_percent),
       resolvePaymentKeyHash(d.fee_address || d.client),
+      // Validator expects expiration as POSIXTime in MILLISECONDS. The
+      // backend stores a Date which serializes to an ISO string over JSON -
+      // BigInt(isoString) would throw, so coerce through Date.getTime().
       d.expiration
-        ? { alternative: 0, fields: [BigInt(d.expiration)] }
+        ? {
+            alternative: 0,
+            fields: [
+              BigInt(
+                typeof d.expiration === "number"
+                  ? Math.floor(d.expiration)
+                  : new Date(d.expiration).getTime(),
+              ),
+            ],
+          }
         : { alternative: 1, fields: [] },
       resolvePaymentKeyHash(d.arbitrator || d.client),
     ],
