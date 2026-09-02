@@ -334,22 +334,28 @@ export const buildReleaseTransaction = async (
   txBuilder.selectUtxosFrom(cleanUtxos); // Set Collateral (Required for Plutus V3 transactions)
 
   // Collateral is MANDATORY for Plutus script spends. Without it the tx body
-  // has no collateral field and Ogmios/Blockfrost evaluation fails with an
-  // empty "ScriptFailures: {}" error. Eternl returns [] from getCollateral()
-  // unless the user reserved collateral in wallet settings, so fall back to
-  // a pure-ADA wallet UTXO (>= 5 ADA, no native tokens).
+  // has no collateral field and evaluation/submission fails. Eternl returns []
+  // from getCollateral() unless the user reserved collateral in settings, so
+  // fall back to a pure-ADA wallet UTXO. Required collateral is only ~150% of
+  // the tx fee (~0.4-1 ADA), so prefer a UTXO >= 5 ADA but accept anything
+  // >= 1.5 ADA rather than failing.
   const collateralUtxos = await wallet.getCollateral();
   let collateral = collateralUtxos && collateralUtxos[0];
 
   if (!collateral) {
-    collateral = cleanUtxos.find((u) => {
-      const amt = u?.output?.amount || [];
-      return (
-        amt.length === 1 &&
-        amt[0].unit === "lovelace" &&
-        Number(amt[0].quantity) >= 5_000_000
+    const pureAda = cleanUtxos
+      .filter((u) => {
+        const amt = u?.output?.amount || [];
+        return amt.length === 1 && amt[0].unit === "lovelace";
+      })
+      .sort(
+        (a, b) =>
+          Number(b.output.amount[0].quantity) -
+          Number(a.output.amount[0].quantity),
       );
-    });
+    collateral =
+      pureAda.find((u) => Number(u.output.amount[0].quantity) >= 5_000_000) ||
+      pureAda.find((u) => Number(u.output.amount[0].quantity) >= 1_500_000);
     if (collateral) {
       console.log(
         "ℹ️ Wallet has no reserved collateral; using a pure-ADA UTXO as collateral:",
@@ -362,7 +368,7 @@ export const buildReleaseTransaction = async (
     throw new Error(
       "No collateral available. Enable/reserve collateral in your wallet " +
         "settings (Eternl: Wallet > Collateral), or keep a pure-ADA UTXO of " +
-        "at least 5 ADA in your wallet, then try again.",
+        "at least 1.5 ADA in your wallet, then try again.",
     );
   }
 
