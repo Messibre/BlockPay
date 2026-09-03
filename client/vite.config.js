@@ -1,6 +1,29 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { readFileSync } from "node:fs";
+
+function browserE2EWalletBridge() {
+  return {
+    name: "blockpay-browser-e2e-wallet",
+    configureServer(server) {
+      if (process.env.BLOCKPAY_BROWSER_E2E !== "1") return;
+
+      server.middlewares.use("/__blockpay-e2e-wallet", (_request, response) => {
+        const wallets = JSON.parse(
+          readFileSync("/vercel/share/blockpay-test-wallets.json", "utf8"),
+        );
+        response.setHeader("Content-Type", "application/json");
+        response.end(
+          JSON.stringify({
+            mnemonic: wallets.client.mnemonic,
+            blockfrostKey: process.env.VITE_BLOCKFROST_KEY,
+          }),
+        );
+      });
+    },
+  };
+}
 
 // Comprehensive plugin to fix CommonJS import issues (lodash, bech32, etc.)
 function fixCommonJSImports() {
@@ -77,7 +100,18 @@ function fixCommonJSImports() {
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        configure(proxy) {
+          proxy.on("proxyReq", (proxyReq) => proxyReq.removeHeader("origin"));
+        },
+      },
+    },
+  },
   plugins: [
+    browserE2EWalletBridge(),
     react(),
     fixCommonJSImports(),
     nodePolyfills({
