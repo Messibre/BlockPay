@@ -167,10 +167,10 @@ async function main() {
     log("resumed contract at:", contractAddress);
   } else {
     // ---------- 2. Create contract ----------
-    log("STEP 2: creating contract (2 milestones x 6 ADA)");
+    log("STEP 2: creating contract (2 milestones x 2 ADA)");
     const milestones = [
-      { id: "ms-001", title: "First deliverable", amount: 6_000_000 },
-      { id: "ms-002", title: "Final deliverable", amount: 6_000_000 },
+      { id: "ms-001", title: "First deliverable", amount: 2_000_000 },
+      { id: "ms-002", title: "Final deliverable", amount: 2_000_000 },
     ];
     const created = await apiCall("/contracts", {
       method: "POST",
@@ -178,7 +178,7 @@ async function main() {
       body: {
         jobId: "507f1f77bcf86cd799439011", // placeholder ObjectId (no job flow in this test)
         freelancerId,
-        totalAmount: 12_000_000,
+        totalAmount: 4_000_000,
         milestones,
       },
     });
@@ -206,7 +206,7 @@ async function main() {
 
   if (!depositTxHash) {
     // ---------- 3. Deposit (mirrors ContractDetail.jsx proceedWithDeposit) ----------
-    log("STEP 3: building + signing + submitting DEPOSIT (12 ADA)");
+    log("STEP 3: building + signing + submitting DEPOSIT (4 ADA)");
     depositTxHash = await buildDepositTransaction(
       clientWallet,
       contractAddress,
@@ -260,18 +260,26 @@ async function main() {
     log("contract is FUNDED (verified on-chain)");
   }
 
-  // ---------- 4. Release milestone ms-001 (mirrors handleApproveMilestone) ----------
-  log("STEP 4: building + signing + submitting RELEASE for ms-001");
+  // ---------- 4. Submit work (the frontend only shows Approve afterwards) ----------
   const milestoneId = "ms-001";
-  const milestoneAmount = 6_000_000;
+  const submitted = await apiCall(
+    `/contracts/${contractId}/milestones/${milestoneId}/submit`,
+    { method: "POST", token: freelancerToken, body: { note: "e2e deliverable" } },
+  );
+  log("submitMilestone ->", submitted.status, JSON.stringify(submitted.json).slice(0, 150));
+  if (submitted.status !== 200) {
+    throw new Error(`submitMilestone failed with ${submitted.status}`);
+  }
 
+  // ---------- 5. Release milestone (mirrors the repaired frontend handler) ----------
+  log("STEP 5: decoding escrow datum and submitting RELEASE for ms-001");
   const onChainUtxos = await provider.fetchAddressUTxOs(contractAddress);
   log(`script address has ${onChainUtxos.length} utxos`);
 
   const rawUtxo = findEscrowUtxo(onChainUtxos, {
     milestoneId,
     clientAddress: clientAddr,
-    depositTxHashes: [depositTxHash],
+    contractNonce: contractDatum.contractNonce,
   });
   if (!rawUtxo) throw new Error("findEscrowUtxo returned no match!");
   log(
@@ -279,12 +287,6 @@ async function main() {
     (rawUtxo.input?.txHash || rawUtxo.txHash) + "#" +
       (rawUtxo.input?.outputIndex ?? rawUtxo.outputIndex),
   );
-  const pickedTx = rawUtxo.input?.txHash || rawUtxo.txHash;
-  if (pickedTx !== depositTxHash) {
-    throw new Error(
-      `findEscrowUtxo picked WRONG utxo (${pickedTx}), expected ${depositTxHash}`,
-    );
-  }
 
   const formattedUtxo = {
     input: {
@@ -296,15 +298,38 @@ async function main() {
       amount: rawUtxo.amount || rawUtxo.output?.amount,
     },
   };
+  const chainDatum = rawUtxo.escrowDatum;
+  const milestone = chainDatum.milestones.find((item) => item.id === milestoneId);
+  if (!milestone || milestone.paid) {
+    throw new Error("Expected an unpaid ms-001 in the selected chain datum");
+  }
 
-  const feePercent = contractDatum.feePercent || 100;
-  const feeAmount = Math.floor((milestoneAmount * feePercent) / 10000);
-  const payoutAmount = milestoneAmount - feeAmount;
-  const remainingAmount = datum.total_amount - milestoneAmount;
+  const currentDatum = {
+    client: contractDatum.client,
+    freelancer: contractDatum.freelancer,
+    total_amount: chainDatum.total_amount,
+    milestones: chainDatum.milestones,
+    contract_nonce: chainDatum.contract_nonce,
+    fee_percent: chainDatum.fee_percent,
+    fee_address: isBech32(contractDatum.feeAddress)
+      ? contractDatum.feeAddress
+      : contractDatum.client,
+    expiration: chainDatum.expiration,
+    arbitrator: contractDatum.client,
+  };
+  const feeAmount = Math.floor(
+    (milestone.amount * chainDatum.fee_percent) / 10000,
+  );
+  const payoutAmount = milestone.amount - feeAmount;
+  const inputLovelace = Number(
+    formattedUtxo.output.amount.find((item) => item.unit === "lovelace")
+      ?.quantity || 0,
+  );
+  const remainingAmount = inputLovelace - milestone.amount;
   const newDatum = {
-    ...datum,
-    milestones: datum.milestones.map((m) =>
-      m.id === milestoneId ? { ...m, paid: true } : m,
+    ...currentDatum,
+    milestones: currentDatum.milestones.map((item) =>
+      item.id === milestoneId ? { ...item, paid: true } : item,
     ),
   };
 
@@ -312,29 +337,19 @@ async function main() {
     clientWallet,
     contractAddress,
     milestoneId,
-    datum,
+    currentDatum,
     newDatum,
     payoutAmount,
     seeds.freelancer.address,
     remainingAmount,
     formattedUtxo,
-    datum.fee_address,
+    currentDatum.fee_address,
     feeAmount,
   );
   log("RELEASE submitted:", releaseTxHash);
-
   await waitForTx(releaseTxHash, "RELEASE");
 
-  // ---------- 5. Submit milestone as freelancer, then record approval ----------
-  const submitted = await apiCall(
-    `/contracts/${contractId}/milestones/${milestoneId}/submit`,
-    { method: "POST", token: freelancerToken, body: { note: "e2e deliverable" } },
-  );
-  log("submitMilestone ->", submitted.status, JSON.stringify(submitted.json).slice(0, 150));
-  if (submitted.status !== 200) {
-    throw new Error(`submitMilestone failed with ${submitted.status}`);
-  }
-
+  // ---------- 6. Record approval and retry idempotently ----------
   const approved = await apiCall(
     `/contracts/${contractId}/milestones/${milestoneId}/approve`,
     { method: "POST", token: clientToken, body: { txHash: releaseTxHash } },
@@ -349,7 +364,41 @@ async function main() {
     );
   }
 
-  // ---------- 6. Verify freelancer payout on-chain ----------
+  const approvalRetry = await apiCall(
+    `/contracts/${contractId}/milestones/${milestoneId}/approve`,
+    { method: "POST", token: clientToken, body: { txHash: releaseTxHash } },
+  );
+  log(
+    "approveMilestone retry ->",
+    approvalRetry.status,
+    JSON.stringify(approvalRetry.json).slice(0, 300),
+  );
+  if (approvalRetry.status !== 200 || !approvalRetry.json.idempotent) {
+    throw new Error("Approval retry was not handled idempotently");
+  }
+
+  // A normal Release pays the freelancer immediately. Withdraw is recovery
+  // only, so the backend must reject it after this confirmed payout.
+  const withdrawal = await apiCall(
+    `/contracts/${contractId}/milestones/${milestoneId}/withdraw`,
+    {
+      method: "POST",
+      token: freelancerToken,
+      body: { txHash: "0".repeat(64) },
+    },
+  );
+  log(
+    "withdraw after confirmed release ->",
+    withdrawal.status,
+    JSON.stringify(withdrawal.json).slice(0, 300),
+  );
+  if (withdrawal.status !== 409) {
+    throw new Error(
+      `Withdrawal should be blocked after release; got ${withdrawal.status}`,
+    );
+  }
+
+  // ---------- 7. Verify freelancer payout on-chain ----------
   const fUtxos = await provider.fetchAddressUTxOs(seeds.freelancer.address);
   const fBalance = fUtxos
     .flatMap((u) => u.output.amount)
