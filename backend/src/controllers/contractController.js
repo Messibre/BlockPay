@@ -475,10 +475,40 @@ export const approveMilestone = async (req, res, next) => {
       contract.contractAddress,
     );
     if (!verification.valid) {
+      if (verification.status === 'PENDING') {
+        await Payment.findOneAndUpdate(
+          { txHash },
+          {
+            $setOnInsert: {
+              contractId,
+              milestoneId,
+              paymentType: 'release',
+              amountADA: payoutLovelace / 1_000_000,
+              txHash,
+              status: 'PENDING',
+              explorerLink: verification.explorerLink,
+              fromAddress: contract.contractAddress,
+              toAddress: freelancerAddress,
+              feeAmount: feeLovelace > 0 ? feeLovelace / 1_000_000 : undefined,
+              feeAddress: platformFeeAddress || undefined,
+            },
+          },
+          { upsert: true, new: true },
+        );
+      } else if (matchingExisting && existingPayment.status === 'PENDING') {
+        existingPayment.status = 'FAILED';
+        await existingPayment.save();
+      }
+
       return res.status(verification.status === 'PENDING' ? 202 : 422).json({
-        message: 'Transaction verification failed',
+        message:
+          verification.status === 'PENDING'
+            ? 'Release submitted and awaiting on-chain confirmation'
+            : 'Transaction verification failed',
         error: verification.error,
         status: verification.status,
+        txHash,
+        explorerLink: verification.explorerLink,
       });
     }
 
@@ -493,8 +523,26 @@ export const approveMilestone = async (req, res, next) => {
     }
 
     const payoutAda = payoutLovelace / 1_000_000;
-    if (!matchingExisting) {
-      const payment = new Payment({
+    const shouldNotifyFreelancer =
+      !matchingExisting || existingPayment.status !== 'CONFIRMED';
+    if (matchingExisting) {
+      existingPayment.status = 'CONFIRMED';
+      existingPayment.amountADA = payoutAda;
+      existingPayment.blockTime = verification.blockTime;
+      existingPayment.blockHeight = verification.blockHeight;
+      existingPayment.explorerLink = verification.explorerLink;
+      existingPayment.fromAddress = contract.contractAddress;
+      existingPayment.toAddress = freelancerAddress;
+      existingPayment.signerAddress =
+        existingPayment.signerAddress || req.body.signerAddress || null;
+      existingPayment.signerSignature =
+        existingPayment.signerSignature || req.body.signerSignature || null;
+      existingPayment.feeAmount =
+        feeLovelace > 0 ? feeLovelace / 1_000_000 : undefined;
+      existingPayment.feeAddress = platformFeeAddress || undefined;
+      await existingPayment.save();
+    } else {
+      await Payment.create({
         contractId,
         milestoneId,
         paymentType: 'release',
@@ -511,7 +559,6 @@ export const approveMilestone = async (req, res, next) => {
         feeAmount: feeLovelace > 0 ? feeLovelace / 1_000_000 : undefined,
         feeAddress: platformFeeAddress || undefined,
       });
-      await payment.save();
     }
 
     // Complete state reconciliation even if a previous request saved Payment
@@ -522,8 +569,8 @@ export const approveMilestone = async (req, res, next) => {
     if (datumMilestone) datumMilestone.paid = true;
     await contract.save();
 
-    // A retry must not create duplicate notifications.
-    if (!matchingExisting) {
+    // Notify once when a new or previously-pending release becomes confirmed.
+    if (shouldNotifyFreelancer) {
       await createNotification({
         recipientId: contract.freelancerId,
         type: 'payment_received',

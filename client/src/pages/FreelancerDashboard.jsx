@@ -12,13 +12,18 @@ function FreelancerDashboardContent() {
   const { user } = useAuth();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-  // Show empty stats and no notifications by default
+  const { data: dashboardData } = useQuery({
+    queryKey: ["dashboard-stats", "freelancer"],
+    queryFn: () => api.getDashboardStats(),
+    refetchInterval: 15000,
+  });
   const stats = {
-    jobsRecommended: 0,
-    activeContracts: 0,
-    pendingProposals: 0,
-    totalEarnings: 0,
+    jobsRecommended: dashboardData?.jobsRecommended || 0,
+    activeContracts: dashboardData?.activeContracts || 0,
+    pendingProposals: dashboardData?.pendingProposals || 0,
+    totalEarnings: Number(dashboardData?.totalEarnings || 0),
   };
+  const recentPayments = dashboardData?.recentPayments || [];
 
   // Fetch notifications
   const { data: notificationsData, refetch: refetchNotifications } = useQuery({
@@ -108,7 +113,9 @@ function FreelancerDashboardContent() {
 
           <Card className={styles.statCard}>
             <h3>Total Earnings</h3>
-            <div className={styles.statValue}>{stats.totalEarnings} ADA</div>
+            <div className={styles.statValue}>
+              {stats.totalEarnings.toFixed(2)} ADA
+            </div>
             <Link to="/contracts">View earnings</Link>
           </Card>
         </div>
@@ -117,7 +124,27 @@ function FreelancerDashboardContent() {
           <div className={styles.section}>
             <h2>Recent Payments</h2>
             <Card>
-              <p className={styles.empty}>No recent payments</p>
+              {recentPayments.length === 0 ? (
+                <p className={styles.empty}>No confirmed payments yet</p>
+              ) : (
+                <ul className={styles.paymentList}>
+                  {recentPayments.map((payment) => (
+                    <li key={payment.txHash} className={styles.paymentItem}>
+                      <div>
+                        <strong>+{Number(payment.amountADA).toFixed(2)} ADA</strong>
+                        <span>
+                          {new Date(
+                            payment.blockTime || payment.createdAt,
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <Link to={`/contracts/${payment.contractId}`}>
+                        View contract
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Card>
           </div>
 
