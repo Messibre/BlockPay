@@ -1,7 +1,8 @@
 import Contract from '../models/Contract.js';
-import { verifyDeposit, verifyPayout } from '../services/chainVerifier.js';
 import Payment from '../models/Payment.js';
 import User from '../models/User.js';
+import { verifyDeposit, verifyPayout } from '../services/chainVerifier.js';
+
 import { createNotification } from './notificationController.js';
 
 // Get configured contract address (use env var for deployed script), otherwise keep fallback
@@ -392,116 +393,114 @@ export const approveMilestone = async (req, res, next) => {
     const { txHash } = req.body;
     const contractId = req.params.id;
 
+    if (!txHash) {
+      return res.status(400).json({ message: 'A confirmed release txHash is required' });
+    }
+
     const contract = await Contract.findById(contractId).populate(
       'freelancerId',
       'walletAddress wallets',
     );
-
     if (!contract) {
-      console.warn(`Contract not found: ${contractId}`);
       return res.status(404).json({ message: 'Contract not found' });
     }
-
-    // Verify client owns this contract
     if (contract.clientId.toString() !== req.userId) {
       return res.status(403).json({ message: 'Only the client can approve milestones' });
     }
 
-    // Find milestone
-    // Mongoose might conflict 'id' field with virtual getter.
-    // We check both the field 'id' and '_id' just in case, but usually we want the custom 'id' field.
-    const milestone = contract.milestones.find((m) => m.id === milestoneId);
-    
+    const milestone = contract.milestones.find((item) => item.id === milestoneId);
     if (!milestone) {
-      const available = contract.milestones.map(m => ({ 
-        id_field: m.get('id'), // Explicitly get the field
-        virtual_id: m.id,      // The property access
-        _id: m._id 
-      }));
-      
-      console.warn(`Milestone not found. ContractId: ${contractId}, Requested: ${milestoneId}`);
-      console.warn('Available:', JSON.stringify(available));
+      return res.status(404).json({ message: 'Milestone not found' });
+    }
 
-      return res.status(404).json({ 
-        message: 'Milestone not found', 
-        debug: {
-          requestedId: milestoneId,
-          contractId,
-          availableIds: available
-        }
+    // A chain transaction can only belong to one release. Matching reuse is
+    // an idempotent retry; cross-contract/milestone reuse is rejected.
+    const existingPayment = await Payment.findOne({ txHash });
+    const matchingExisting =
+      existingPayment &&
+      String(existingPayment.contractId) === String(contractId) &&
+      existingPayment.milestoneId === milestoneId &&
+      existingPayment.paymentType === 'release';
+    if (existingPayment && !matchingExisting) {
+      return res.status(409).json({
+        message: 'Transaction hash is already assigned to another payment',
       });
     }
 
+    if (milestone.status === 'approved') {
+      if (!matchingExisting) {
+        return res.status(409).json({
+          message: 'Milestone is already approved with a different release transaction',
+        });
+      }
+      return res.json({
+        message: 'Milestone release was already recorded',
+        milestone: {
+          id: milestone.id,
+          status: milestone.status,
+          approvedAt: milestone.approvedAt,
+        },
+        txHash,
+        idempotent: true,
+      });
+    }
     if (milestone.status !== 'submitted') {
       return res.status(400).json({
         message: `Milestone must be submitted before approval. Current status: ${milestone.status}`,
       });
     }
 
-    // If txHash provided, verify the release transaction
-    if (txHash) {
-      const freelancerAddress =
-        resolvePrimaryAddress(contract.freelancerId) || contract.datum?.freelancer;
-      if (!freelancerAddress) {
-        return res.status(422).json({
-          message: 'Freelancer has no linked wallet address to verify the payout against',
-        });
+    const freelancerAddress =
+      contract.datum?.freelancer || resolvePrimaryAddress(contract.freelancerId);
+    if (!freelancerAddress) {
+      return res.status(422).json({
+        message: 'Freelancer has no linked wallet address to verify the payout against',
+      });
+    }
+
+    const milestoneLovelace = Number(milestone.amount);
+    const feePercent = contract.datum?.feePercent || 100;
+    const feeLovelace = Math.floor((milestoneLovelace * feePercent) / 10000);
+    const payoutLovelace = milestoneLovelace - feeLovelace;
+    const MIN_UTXO_LOVELACE = 1_000_000;
+    const platformFeeAddress =
+      feeLovelace >= MIN_UTXO_LOVELACE ? process.env.PLATFORM_FEE_ADDRESS || null : null;
+
+    const verification = await verifyPayout(
+      txHash,
+      freelancerAddress,
+      payoutLovelace,
+      platformFeeAddress,
+      feeLovelace,
+      contract.contractAddress,
+    );
+    if (!verification.valid) {
+      return res.status(verification.status === 'PENDING' ? 202 : 422).json({
+        message: 'Transaction verification failed',
+        error: verification.error,
+        status: verification.status,
+      });
+    }
+
+    if (req.body.signerAddress && !matchingExisting) {
+      const user = await User.findById(req.userId);
+      const linked =
+        (user.wallets || []).some((wallet) => wallet.address === req.body.signerAddress) ||
+        user.walletAddress === req.body.signerAddress;
+      if (!linked) {
+        return res.status(403).json({ message: 'Signer address not linked to your account' });
       }
-      // milestone.amount is stored in LOVELACE (see Contract model) - do NOT
-      // multiply by 1e6 again. Doing so made verification demand a payout a
-      // million times larger than the real one and 422'd every valid release.
-      const milestoneLovelace = Number(milestone.amount);
-      const feePercent = contract.datum.feePercent || 100;
-      const feeLovelace = Math.floor((milestoneLovelace * feePercent) / 10000);
-      const payoutLovelace = milestoneLovelace - feeLovelace;
+    }
 
-      // Verify payout to freelancer and platform fee (if configured).
-      // The frontend only adds a separate fee output when it clears Cardano's
-      // min-UTxO (~1 ADA) - tiny fees stay with the change instead. Mirror
-      // that rule here or every small-fee release gets rejected with
-      // "No output to platform fee recipient found".
-      const MIN_UTXO_LOVELACE = 1_000_000;
-      const platformFeeAddress =
-        feeLovelace >= MIN_UTXO_LOVELACE
-          ? process.env.PLATFORM_FEE_ADDRESS || null
-          : null;
-
-      const verification = await verifyPayout(
-        txHash,
-        freelancerAddress,
-        payoutLovelace,
-        platformFeeAddress,
-        feeLovelace,
-      );
-
-      if (!verification.valid) {
-        return res.status(422).json({
-          message: 'Transaction verification failed',
-          error: verification.error,
-          status: verification.status,
-        });
-      }
-
-      // Record payment
-      // If signerAddress provided, ensure it belongs to this user
-      if (req.body.signerAddress) {
-        const user = await User.findById(req.userId);
-        const linked =
-          (user.wallets || []).some((w) => w.address === req.body.signerAddress) ||
-          user.walletAddress === req.body.signerAddress;
-        if (!linked) {
-          return res.status(403).json({ message: 'Signer address not linked to your account' });
-        }
-      }
-
-      const payoutAda = payoutLovelace / 1_000_000;
+    const payoutAda = payoutLovelace / 1_000_000;
+    if (!matchingExisting) {
       const payment = new Payment({
         contractId,
         milestoneId,
         paymentType: 'release',
         amountADA: payoutAda,
         txHash,
-        status: verification.status || 'CONFIRMED',
+        status: 'CONFIRMED',
         blockTime: verification.blockTime,
         blockHeight: verification.blockHeight,
         explorerLink: verification.explorerLink,
@@ -512,10 +511,19 @@ export const approveMilestone = async (req, res, next) => {
         feeAmount: feeLovelace > 0 ? feeLovelace / 1_000_000 : undefined,
         feeAddress: platformFeeAddress || undefined,
       });
-
       await payment.save();
+    }
 
-      // Notify freelancer of payment release
+    // Complete state reconciliation even if a previous request saved Payment
+    // and failed before updating the contract document.
+    milestone.status = 'approved';
+    milestone.approvedAt = milestone.approvedAt || new Date();
+    const datumMilestone = contract.datum?.milestones?.find((item) => item.id === milestoneId);
+    if (datumMilestone) datumMilestone.paid = true;
+    await contract.save();
+
+    // A retry must not create duplicate notifications.
+    if (!matchingExisting) {
       await createNotification({
         recipientId: contract.freelancerId,
         type: 'payment_received',
@@ -525,26 +533,17 @@ export const approveMilestone = async (req, res, next) => {
       });
     }
 
-    // Update milestone status
-    milestone.status = 'approved';
-    milestone.approvedAt = new Date();
-
-    // Update datum milestone to paid
-    const datumMilestone = contract.datum.milestones.find((m) => m.id === milestoneId);
-    if (datumMilestone) {
-      datumMilestone.paid = true;
-    }
-
-    await contract.save();
-
     res.json({
-      message: 'Milestone approved successfully',
+      message: matchingExisting
+        ? 'Milestone release reconciled successfully'
+        : 'Milestone approved successfully',
       milestone: {
         id: milestone.id,
         status: milestone.status,
         approvedAt: milestone.approvedAt,
       },
-      txHash: txHash || null,
+      txHash,
+      idempotent: Boolean(matchingExisting),
     });
   } catch (error) {
     next(error);
@@ -640,9 +639,7 @@ export const refundContract = async (req, res, next) => {
       .filter((m) => m.paid)
       .reduce((sum, m) => sum + Number(m.amount), 0);
     if (paidLovelace > 0) {
-      const exp = contract.datum?.expiration
-        ? new Date(contract.datum.expiration).getTime()
-        : null;
+      const exp = contract.datum?.expiration ? new Date(contract.datum.expiration).getTime() : null;
       if (!exp || Date.now() <= exp) {
         return res.status(422).json({
           message:
@@ -739,9 +736,7 @@ export const withdrawMilestone = async (req, res, next) => {
     }
 
     // The on-chain datum must mark the milestone paid (validator requirement)
-    const datumMilestone = (contract.datum?.milestones || []).find(
-      (m) => m.id === milestoneId,
-    );
+    const datumMilestone = (contract.datum?.milestones || []).find((m) => m.id === milestoneId);
     if (!datumMilestone?.paid) {
       return res.status(422).json({
         message: 'Milestone is not marked paid on-chain - it must be released first.',
@@ -773,8 +768,7 @@ export const withdrawMilestone = async (req, res, next) => {
     const feeLovelace = Math.floor((milestoneLovelace * feePercent) / 10000);
     const payoutLovelace = milestoneLovelace - feeLovelace;
 
-    const freelancerAddress =
-      contract.datum?.freelancer || contract.freelancerId?.walletAddress;
+    const freelancerAddress = contract.datum?.freelancer || contract.freelancerId?.walletAddress;
     if (!freelancerAddress) {
       return res.status(422).json({ message: 'No freelancer address on contract' });
     }

@@ -91,6 +91,7 @@ export const verifyPayout = async (
   expectedAmount,
   expectedFeeRecipient = null,
   expectedFeeAmount = 0,
+  expectedInputAddress = null,
 ) => {
   try {
     const tx = await getTransaction(txHash);
@@ -105,6 +106,16 @@ export const verifyPayout = async (
     const utxos = await getTransactionUtxos(txHash);
     if (!utxos) {
       return { valid: false, error: 'UTxOs not found' };
+    }
+
+    if (
+      expectedInputAddress &&
+      !utxos.inputs?.some((input) => input.address === expectedInputAddress)
+    ) {
+      return {
+        valid: false,
+        error: 'Transaction does not spend this contract escrow address',
+      };
     }
 
     const outputToRecipient = utxos.outputs?.find((out) => out.address === expectedRecipient);

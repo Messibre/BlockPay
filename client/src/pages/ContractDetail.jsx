@@ -2,7 +2,10 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@meshsdk/react";
-import { resolvePlutusScriptAddress } from "@meshsdk/core";
+import {
+  resolvePaymentKeyHash,
+  resolvePlutusScriptAddress,
+} from "@meshsdk/core";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useToast } from "../contexts/ToastContext.jsx";
 import Card from "../components/Card.jsx";
@@ -347,7 +350,16 @@ export default function ContractDetail() {
     try {
       const pendingTxHash = localStorage.getItem(pendingKey);
       if (pendingTxHash) {
-        await api.approveMilestone(id, milestoneId, pendingTxHash);
+        const recording = await api.approveMilestone(
+          id,
+          milestoneId,
+          pendingTxHash,
+        );
+        if (recording?.status === "PENDING") {
+          throw new Error(
+            "Release transaction is still awaiting on-chain confirmation.",
+          );
+        }
         localStorage.removeItem(pendingKey);
         success(
           `Milestone release recorded! TX: ${pendingTxHash.slice(0, 16)}...`,
@@ -362,133 +374,157 @@ export default function ContractDetail() {
       }
 
       const scriptAddress = contract.contractAddress;
-      const response = await api.getScriptUtxos(scriptAddress);
-      const utxos = response.utxos || [];
+      const isBech32 = (value) =>
+        typeof value === "string" &&
+        /^(addr1|addr_test1)[0-9a-z]+$/.test(value) &&
+        value.length >= 8;
+      const hashMatches = (candidate, expectedHash) =>
+        isBech32(candidate) &&
+        resolvePaymentKeyHash(candidate).toLowerCase() ===
+          String(expectedHash).toLowerCase();
 
-      if (!utxos || utxos.length === 0) {
-        throw new Error("No UTxOs found in contract script");
-      }
-
-      // Basic address validator
-      const isBech32 = (s) =>
-        typeof s === "string" &&
-        /^(addr1|addr_test1)[0-9a-z]+$/.test(s) &&
-        s.length >= 8;
-
-      // 2. Resolve Addresses
       const clientAddr = isBech32(contract.datum?.client)
         ? contract.datum.client
         : isBech32(address)
           ? address
           : null;
-
-      if (!clientAddr) throw new Error("Invalid client address on contract");
-
       const freelancerAddr = isBech32(contract.datum?.freelancer)
         ? contract.datum.freelancer
         : isBech32(contract.freelancerId?.walletAddress)
           ? contract.freelancerId.walletAddress
           : null;
-
+      if (!clientAddr) throw new Error("Invalid client address on contract");
       if (!freelancerAddr)
         throw new Error("Invalid freelancer address on contract");
-
-      const feeAddr = isBech32(contract.datum?.feeAddress)
-        ? contract.datum.feeAddress
-        : null;
-      const arbitratorAddr = isBech32(contract.datum?.arbitrator)
-        ? contract.datum.arbitrator
-        : null;
-
-      // 3. Construct Current Datum
-      const currentDatum = {
-        client: clientAddr,
-        freelancer: freelancerAddr,
-        total_amount: contract.totalAmount,
-        milestones:
-          contract.datum?.milestones ||
-          (contract.milestones || []).map((m) => ({
-            id: m.id,
-            amount: m.amount,
-            paid: m.status === "approved" || m.status === "paid",
-          })),
-        contract_nonce: contract.datum?.contractNonce,
-        fee_percent: contract.datum?.feePercent || 100,
-        fee_address: feeAddr || clientAddr, // Fallback to client if fee addr missing
-        expiration: contract.datum?.expiration || null,
-        arbitrator: arbitratorAddr || clientAddr, // Fallback
-      };
-
-      // The nonce must byte-match the on-chain datum; a made-up fallback
-      // would silently produce an unspendable rebuild.
-      if (!currentDatum.contract_nonce) {
+      if (!contract.datum?.contractNonce) {
         throw new Error(
-          "Contract is missing its on-chain nonce (datum.contractNonce) - cannot rebuild the escrow datum.",
+          "Contract is missing its on-chain nonce (datum.contractNonce).",
         );
       }
 
-      // Validate critical addresses
-      if (!isBech32(currentDatum.client)) {
-        throw new Error(`Invalid client address: ${currentDatum.client}`);
-      }
-      if (!isBech32(currentDatum.freelancer)) {
-        throw new Error(
-          `Invalid freelancer address: ${currentDatum.freelancer}`,
-        );
-      }
-
-      // 4. Find relevant UTxO
-      // 1. Initialize the provider (if not already done)
       const blockfrostProvider = new BlockfrostProvider(
         import.meta.env.VITE_BLOCKFROST_KEY,
       );
-
-      // 2. Fetch directly using the fetcher interface
-      // In Mesh, the provider is also the fetcher.
-      // Use .fetchAddressUtxos (plural) or .fetchUtxos based on your MeshTxBuilder setup
       let onChainUtxos = [];
       try {
-        // Try the most common Mesh fetcher method
         onChainUtxos =
           await blockfrostProvider.fetchAddressUTxOs(scriptAddress);
       } catch {
-        // Fallback for different Mesh versions
         onChainUtxos = await blockfrostProvider.fetchUtxos(scriptAddress);
       }
-
-      console.log("On-chain UTXOs found:", onChainUtxos);
-
-      if (!onChainUtxos || onChainUtxos.length === 0) {
-        throw new Error(
-          `No funds found at: ${scriptAddress}. You must deposit to THIS address first.`,
-        );
+      if (!onChainUtxos?.length) {
+        throw new Error(`No escrow funds found at ${scriptAddress}.`);
       }
 
-      // 3. Find the UTXO that belongs to THIS contract. Match primarily by
-      // this contract's recorded deposit tx hashes (unambiguous), falling
-      // back to inline-datum content (milestone id + client key hash).
-      // NEVER take the first UTXO blindly - the script address holds
-      // deposits from many contracts.
+      // The selected UTxO's decoded inline datum is authoritative. Mongo can
+      // lag a confirmed release, and deposit hashes do not identify the
+      // continuation output created by later releases.
       const rawUtxo = findEscrowUtxo(onChainUtxos, {
         milestoneId,
         clientAddress: clientAddr,
-        depositTxHashes: (contract.deposits || [])
-          .map((d) => d.txHash)
-          .filter(Boolean),
+        contractNonce: contract.datum.contractNonce,
       });
-
       if (!rawUtxo) {
         throw new Error(
-          `No escrow UTXO for this contract found at ${scriptAddress}. ` +
-            `The deposit may not be confirmed yet, or it was made with an ` +
-            `older (incompatible) datum format - in that case create a new ` +
-            `contract and deposit again.`,
+          "No current escrow UTxO matches this contract nonce and client.",
         );
       }
 
+      const chainDatum = rawUtxo.escrowDatum;
+      if (!hashMatches(clientAddr, chainDatum.clientHash)) {
+        throw new Error("Client address does not match the on-chain datum.");
+      }
+      if (!hashMatches(freelancerAddr, chainDatum.freelancerHash)) {
+        throw new Error(
+          "Freelancer address does not match the on-chain datum.",
+        );
+      }
+      if (chainDatum.total_amount !== Number(contract.totalAmount)) {
+        throw new Error("Backend and on-chain contract totals do not match.");
+      }
+
+      const backendMilestones = new Map(
+        contract.milestones.map((item) => [item.id, Number(item.amount)]),
+      );
+      if (
+        chainDatum.milestones.length !== backendMilestones.size ||
+        chainDatum.milestones.some(
+          (item) => backendMilestones.get(item.id) !== item.amount,
+        )
+      ) {
+        throw new Error(
+          "Backend and on-chain milestone identities or amounts do not match.",
+        );
+      }
+
+      const chainMilestone = chainDatum.milestones.find(
+        (item) => item.id === milestoneId,
+      );
+      if (!chainMilestone) {
+        throw new Error("Milestone is missing from the on-chain datum.");
+      }
+
+      const currentTxHash = rawUtxo.txHash || rawUtxo.input?.txHash;
+      if (chainMilestone.paid) {
+        // The chain already accepted this release while Mongo remained stale.
+        // Reconcile that confirmed transaction instead of submitting a
+        // duplicate Release that the validator must reject.
+        const recording = await api.approveMilestone(
+          id,
+          milestoneId,
+          currentTxHash,
+        );
+        if (recording?.status === "PENDING") {
+          throw new Error(
+            "Confirmed chain state is not indexed by the verifier yet. Please retry shortly.",
+          );
+        }
+        localStorage.removeItem(pendingKey);
+        success(
+          `Confirmed release reconciled! TX: ${currentTxHash.slice(0, 16)}...`,
+        );
+        queryClient.invalidateQueries(["contract", id]);
+        return;
+      }
+
+      const addressCandidates = [
+        contract.datum?.feeAddress,
+        clientAddr,
+        address,
+      ].filter(Boolean);
+      const feeAddress = addressCandidates.find((candidate) =>
+        hashMatches(candidate, chainDatum.feeAddressHash),
+      );
+      const arbitratorAddress = [contract.datum?.arbitrator, clientAddr].find(
+        (candidate) => hashMatches(candidate, chainDatum.arbitratorHash),
+      );
+      if (!feeAddress || !arbitratorAddress) {
+        throw new Error(
+          "Could not map the on-chain fee or arbitrator hash to a known address.",
+        );
+      }
+
+      const currentDatum = {
+        client: clientAddr,
+        freelancer: freelancerAddr,
+        total_amount: chainDatum.total_amount,
+        milestones: chainDatum.milestones,
+        contract_nonce: chainDatum.contract_nonce,
+        fee_percent: chainDatum.fee_percent,
+        fee_address: feeAddress,
+        expiration: chainDatum.expiration,
+        arbitrator: arbitratorAddress,
+      };
+      const newDatum = {
+        ...currentDatum,
+        milestones: currentDatum.milestones.map((item) =>
+          item.id === milestoneId ? { ...item, paid: true } : item,
+        ),
+      };
+
       const formattedUtxo = {
         input: {
-          txHash: rawUtxo.txHash || rawUtxo.input?.txHash,
+          txHash: currentTxHash,
           outputIndex: rawUtxo.outputIndex ?? rawUtxo.input?.outputIndex,
         },
         output: {
@@ -496,26 +532,19 @@ export default function ContractDetail() {
           amount: rawUtxo.amount || rawUtxo.output?.amount,
         },
       };
-
-      const milestoneAmount = milestone.amount;
-      const feePercent = contract.datum?.feePercent || 100;
-      const feeAmount = Math.floor((milestoneAmount * feePercent) / 10000);
+      const inputLovelace = Number(
+        formattedUtxo.output.amount?.find((item) => item.unit === "lovelace")
+          ?.quantity || 0,
+      );
+      const milestoneAmount = chainMilestone.amount;
+      const feeAmount = Math.floor(
+        (milestoneAmount * chainDatum.fee_percent) / 10000,
+      );
       const payoutAmount = milestoneAmount - feeAmount;
-      const remainingAmount = currentDatum.total_amount - milestoneAmount;
-
-      // 5. Construct New Datum
-      const newDatum = {
-        ...currentDatum,
-        milestones: currentDatum.milestones.map((m) =>
-          m.id === milestoneId ? { ...m, paid: true } : m,
-        ),
-      };
-
-      // 6. Build Transaction
-      const feeAddress =
-        currentDatum.fee_address ||
-        import.meta?.env?.VITE_PLATFORM_FEE_ADDRESS ||
-        null;
+      const remainingAmount = inputLovelace - milestoneAmount;
+      if (inputLovelace < milestoneAmount || remainingAmount < 0) {
+        throw new Error("Escrow UTxO does not contain this milestone's funds.");
+      }
 
       const txHash = await buildReleaseTransaction(
         wallet,
@@ -524,7 +553,7 @@ export default function ContractDetail() {
         currentDatum,
         newDatum,
         payoutAmount,
-        contract.freelancerId.walletAddress,
+        freelancerAddr,
         remainingAmount,
         formattedUtxo,
         feeAddress,
@@ -536,8 +565,14 @@ export default function ContractDetail() {
       // (and double-spending) the release transaction.
       localStorage.setItem(pendingKey, txHash);
 
-      // 7. Record release with backend
-      await api.approveMilestone(id, milestoneId, txHash);
+      // 7. Record release with backend. A 202 response is not recorded yet,
+      // so keep the pending hash and retry without building another release.
+      const recording = await api.approveMilestone(id, milestoneId, txHash);
+      if (recording?.status === "PENDING") {
+        throw new Error(
+          "Release submitted and awaiting on-chain confirmation. Please retry shortly.",
+        );
+      }
       localStorage.removeItem(pendingKey);
 
       success(`Milestone approved & released! TX: ${txHash.slice(0, 16)}...`);
@@ -588,13 +623,17 @@ export default function ContractDetail() {
     }
   };
 
-  // Shared: rebuild the current on-chain datum and locate this contract's
-  // escrow UTXO at the script address (same matching rules as the release flow).
+  // Shared recovery locator. It uses the selected UTxO's decoded datum rather
+  // than Mongo state, exactly like approval, so paid flags cannot regress.
   const locateEscrowUtxo = async (milestoneId = null) => {
-    const isBech32 = (s) =>
-      typeof s === "string" &&
-      /^(addr1|addr_test1)[0-9a-z]+$/.test(s) &&
-      s.length >= 8;
+    const isBech32 = (value) =>
+      typeof value === "string" &&
+      /^(addr1|addr_test1)[0-9a-z]+$/.test(value) &&
+      value.length >= 8;
+    const hashMatches = (candidate, expectedHash) =>
+      isBech32(candidate) &&
+      resolvePaymentKeyHash(candidate).toLowerCase() ===
+        String(expectedHash).toLowerCase();
 
     const clientAddr = isBech32(contract.datum?.client)
       ? contract.datum.client
@@ -607,37 +646,9 @@ export default function ContractDetail() {
     if (!clientAddr) throw new Error("Invalid client address on contract");
     if (!freelancerAddr)
       throw new Error("Invalid freelancer address on contract");
-
     if (!contract.datum?.contractNonce) {
-      throw new Error(
-        "Contract is missing its on-chain nonce (datum.contractNonce) - cannot rebuild the escrow datum.",
-      );
+      throw new Error("Contract is missing its on-chain nonce.");
     }
-
-    const feeAddr = isBech32(contract.datum?.feeAddress)
-      ? contract.datum.feeAddress
-      : null;
-    const arbitratorAddr = isBech32(contract.datum?.arbitrator)
-      ? contract.datum.arbitrator
-      : null;
-
-    const currentDatum = {
-      client: clientAddr,
-      freelancer: freelancerAddr,
-      total_amount: contract.totalAmount,
-      milestones:
-        contract.datum?.milestones ||
-        (contract.milestones || []).map((m) => ({
-          id: m.id,
-          amount: m.amount,
-          paid: m.status === "approved" || m.status === "paid",
-        })),
-      contract_nonce: contract.datum.contractNonce,
-      fee_percent: contract.datum?.feePercent || 100,
-      fee_address: feeAddr || clientAddr,
-      expiration: contract.datum?.expiration || null,
-      arbitrator: arbitratorAddr || clientAddr,
-    };
 
     const escrowAddress = contract.contractAddress || scriptAddress;
     const blockfrostProvider = new BlockfrostProvider(
@@ -649,23 +660,51 @@ export default function ContractDetail() {
     } catch {
       onChainUtxos = await blockfrostProvider.fetchUtxos(escrowAddress);
     }
-    if (!onChainUtxos || onChainUtxos.length === 0) {
+    if (!onChainUtxos?.length) {
       throw new Error(`No funds found at: ${escrowAddress}.`);
     }
 
     const rawUtxo = findEscrowUtxo(onChainUtxos, {
       milestoneId,
       clientAddress: clientAddr,
-      depositTxHashes: (contract.deposits || [])
-        .map((d) => d.txHash)
-        .filter(Boolean),
+      contractNonce: contract.datum.contractNonce,
     });
     if (!rawUtxo) {
       throw new Error(
-        `No escrow UTXO for this contract found at ${escrowAddress}. The deposit may not be confirmed yet.`,
+        `No escrow UTxO for this contract found at ${escrowAddress}.`,
       );
     }
 
+    const chainDatum = rawUtxo.escrowDatum;
+    if (!hashMatches(clientAddr, chainDatum.clientHash)) {
+      throw new Error("Client address does not match the on-chain datum.");
+    }
+    if (!hashMatches(freelancerAddr, chainDatum.freelancerHash)) {
+      throw new Error("Freelancer address does not match the on-chain datum.");
+    }
+    const feeAddress = [contract.datum?.feeAddress, clientAddr, address].find(
+      (candidate) => hashMatches(candidate, chainDatum.feeAddressHash),
+    );
+    const arbitratorAddress = [contract.datum?.arbitrator, clientAddr].find(
+      (candidate) => hashMatches(candidate, chainDatum.arbitratorHash),
+    );
+    if (!feeAddress || !arbitratorAddress) {
+      throw new Error(
+        "Could not map the on-chain fee or arbitrator hash to a known address.",
+      );
+    }
+
+    const currentDatum = {
+      client: clientAddr,
+      freelancer: freelancerAddr,
+      total_amount: chainDatum.total_amount,
+      milestones: chainDatum.milestones,
+      contract_nonce: chainDatum.contract_nonce,
+      fee_percent: chainDatum.fee_percent,
+      fee_address: feeAddress,
+      expiration: chainDatum.expiration,
+      arbitrator: arbitratorAddress,
+    };
     const formattedUtxo = {
       input: {
         txHash: rawUtxo.txHash || rawUtxo.input?.txHash,
