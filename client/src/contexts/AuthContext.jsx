@@ -1,13 +1,12 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { createContext, useContext, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../services/api.js";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const token = localStorage.getItem("token");
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(!!token);
+  const queryClient = useQueryClient();
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
 
   const { data: userData, isLoading: isFetching } = useQuery({
     queryKey: ["user"],
@@ -16,37 +15,28 @@ export function AuthProvider({ children }) {
     retry: false,
   });
 
-  useEffect(() => {
-    if (userData) {
-      // Handle both direct user object and nested user object from API
-      const user = userData.user || userData;
-      // Map fullName to displayName for consistency
-      if (user && user.fullName && !user.displayName) {
-        user.displayName = user.fullName;
-      }
-      setUser(user);
-    } else if (token && !isFetching) {
-      // Token exists but user fetch failed - invalid token
-      localStorage.removeItem("token");
-      setUser(null);
-    }
-    setIsLoading(isFetching);
-  }, [userData, isFetching, token]);
+  const currentUser = userData?.user || userData;
+  const user =
+    currentUser?.fullName && !currentUser.displayName
+      ? { ...currentUser, displayName: currentUser.fullName }
+      : currentUser || null;
 
-  const login = (tokenData, userData) => {
+  const login = (tokenData, nextUser) => {
     localStorage.setItem("token", tokenData);
-    setUser(userData);
+    queryClient.setQueryData(["user"], nextUser);
+    setToken(tokenData);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
-    setUser(null);
+    queryClient.removeQueries({ queryKey: ["user"], exact: true });
+    setToken(null);
   };
 
   const value = {
     user,
     isAuthenticated: !!token && !!user,
-    isLoading,
+    isLoading: !!token && isFetching,
     login,
     logout,
   };

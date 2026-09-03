@@ -40,8 +40,14 @@ export default function ManageJob() {
     mutationFn: (data) => api.acceptProposal(selectedProposal?._id, data),
     onSuccess: (data) => {
       success("Proposal accepted! Contract created.");
-      queryClient.invalidateQueries(["proposals", jobId]);
-      queryClient.invalidateQueries(["job", jobId]);
+      queryClient.invalidateQueries({
+        queryKey: ["proposals", jobId],
+        exact: true,
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["job", jobId],
+        exact: true,
+      });
       setShowAcceptModal(false);
       navigate(`/contracts/${data.contractId}`);
     },
@@ -54,7 +60,10 @@ export default function ManageJob() {
     mutationFn: (proposalId) => api.rejectProposal(proposalId),
     onSuccess: () => {
       success("Proposal rejected");
-      queryClient.invalidateQueries(["proposals", jobId]);
+      queryClient.invalidateQueries({
+        queryKey: ["proposals", jobId],
+        exact: true,
+      });
     },
     onError: (err) => {
       showError(err.response?.data?.message || "Failed to reject proposal");
