@@ -96,16 +96,31 @@ export const verifyPayout = async (
   try {
     const tx = await getTransaction(txHash);
     if (!tx) {
-      return { valid: false, error: 'Transaction not found' };
+      return {
+        valid: false,
+        error: 'Transaction not found',
+        status: 'PENDING',
+        explorerLink: getExplorerLink(txHash),
+      };
     }
 
     if (tx.block === null) {
-      return { valid: false, error: 'Transaction not confirmed', status: 'PENDING' };
+      return {
+        valid: false,
+        error: 'Transaction not confirmed',
+        status: 'PENDING',
+        explorerLink: getExplorerLink(txHash),
+      };
     }
 
     const utxos = await getTransactionUtxos(txHash);
     if (!utxos) {
-      return { valid: false, error: 'UTxOs not found' };
+      return {
+        valid: false,
+        error: 'UTxOs not found',
+        status: 'PENDING',
+        explorerLink: getExplorerLink(txHash),
+      };
     }
 
     if (
@@ -154,6 +169,21 @@ export const verifyPayout = async (
       explorerLink: getExplorerLink(txHash),
     };
   } catch (error) {
-    return { valid: false, error: error.message };
+    const message = String(error.message || '');
+    const normalizedMessage = message.toLowerCase();
+    if (normalizedMessage.includes('not found') || normalizedMessage.includes('404')) {
+      return {
+        valid: false,
+        error: 'Release transaction is awaiting chain index confirmation',
+        status: 'PENDING',
+        explorerLink: getExplorerLink(txHash),
+      };
+    }
+
+    return {
+      valid: false,
+      error: message,
+      explorerLink: getExplorerLink(txHash),
+    };
   }
 };

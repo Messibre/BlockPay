@@ -340,19 +340,34 @@ export default function ContractDetail() {
     // recording), retry ONLY the recording - never build a second release
     // transaction for the same milestone.
     const pendingKey = `pendingRelease:${id}:${milestoneId}`;
+    const recordReleaseWithRetry = async (txHash) => {
+      const maxAttempts = 6;
+      const retryDelayMs = 5_000;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          return await api.approveMilestone(id, milestoneId, txHash);
+        } catch (recordingError) {
+          const isPending =
+            recordingError.response?.status === 202 ||
+            recordingError.response?.data?.status === "PENDING";
+          if (!isPending) throw recordingError;
+          if (attempt === maxAttempts) {
+            const pendingError = new Error(
+              "Release submitted successfully and is still being indexed. Please retry shortly; no new payment will be made.",
+            );
+            pendingError.code = "RELEASE_INDEXING";
+            throw pendingError;
+          }
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        }
+      }
+    };
+
     try {
       const pendingTxHash = localStorage.getItem(pendingKey);
       if (pendingTxHash) {
-        const recording = await api.approveMilestone(
-          id,
-          milestoneId,
-          pendingTxHash,
-        );
-        if (recording?.status === "PENDING") {
-          throw new Error(
-            "Release transaction is still awaiting on-chain confirmation.",
-          );
-        }
+        await recordReleaseWithRetry(pendingTxHash);
         localStorage.removeItem(pendingKey);
         success(
           `Milestone release recorded! TX: ${pendingTxHash.slice(0, 16)}...`,
@@ -462,16 +477,7 @@ export default function ContractDetail() {
         // The chain already accepted this release while Mongo remained stale.
         // Reconcile that confirmed transaction instead of submitting a
         // duplicate Release that the validator must reject.
-        const recording = await api.approveMilestone(
-          id,
-          milestoneId,
-          currentTxHash,
-        );
-        if (recording?.status === "PENDING") {
-          throw new Error(
-            "Confirmed chain state is not indexed by the verifier yet. Please retry shortly.",
-          );
-        }
+        await recordReleaseWithRetry(currentTxHash);
         localStorage.removeItem(pendingKey);
         success(
           `Confirmed release reconciled! TX: ${currentTxHash.slice(0, 16)}...`,
@@ -558,14 +564,9 @@ export default function ContractDetail() {
       // (and double-spending) the release transaction.
       localStorage.setItem(pendingKey, txHash);
 
-      // 7. Record release with backend. A 202 response is not recorded yet,
-      // so keep the pending hash and retry without building another release.
-      const recording = await api.approveMilestone(id, milestoneId, txHash);
-      if (recording?.status === "PENDING") {
-        throw new Error(
-          "Release submitted and awaiting on-chain confirmation. Please retry shortly.",
-        );
-      }
+      // 7. Record release with backend. A pending verification is retried
+      // without rebuilding or resubmitting the on-chain release.
+      await recordReleaseWithRetry(txHash);
       localStorage.removeItem(pendingKey);
 
       success(`Milestone approved & released! TX: ${txHash.slice(0, 16)}...`);
@@ -583,7 +584,10 @@ export default function ContractDetail() {
       // If the on-chain release succeeded but backend recording failed, make
       // clear the funds already moved and a retry will only re-record.
       if (localStorage.getItem(pendingKey)) {
-        msg = `The payment was released on-chain, but recording it failed: ${msg} - click Approve again to retry recording (no new payment will be made).`;
+        msg =
+          error.code === "RELEASE_INDEXING"
+            ? error.message
+            : `The payment was released on-chain, but recording it failed: ${msg} - click Approve again to retry recording (no new payment will be made).`;
       }
       showError(msg);
       // Log full response for debugging
