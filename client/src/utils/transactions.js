@@ -6,6 +6,7 @@ import {
   BlockfrostProvider,
   unixTimeToEnclosingSlot,
   SLOT_CONFIG_NETWORK,
+  deserializeDatum,
 } from "@meshsdk/core";
 import { contractScript } from "../constants/script";
 
@@ -300,32 +301,16 @@ export const buildReleaseTransaction = async (
   feeAddress = null,
   feeAmount = 0,
 ) => {
-  // Inside buildReleaseTransaction...
-  try {
-    // We manually format the script object so Mesh knows exactly what it is
-    const scriptObject = {
-      code: contractScript.cbor,
-      version: "V3",
-    };
-
-    const derivedAddress = resolvePlutusScriptAddress(scriptObject, 0); // 0 for testnet
-
-    console.log("✅ Derived Address:", derivedAddress);
-    console.log("🏦 UTXO Address:   ", formattedUtxo.output.address);
-
-    if (derivedAddress === formattedUtxo.output.address) {
-      console.log("✨ PERFECT MATCH!");
-    } else {
-      console.error("❌ MISMATCH: Your CBOR is for a different address.");
-    }
-  } catch (e) {
-    console.error("❌ Derivation failed:", e.message);
+  const scriptObject = { code: contractScript.cbor, version: "V3" };
+  const derivedAddress = resolvePlutusScriptAddress(scriptObject, 0);
+  if (
+    derivedAddress !== scriptAddress ||
+    derivedAddress !== formattedUtxo.output.address
+  ) {
+    throw new Error(
+      "Escrow UTxO address does not match the configured validator script.",
+    );
   }
-
-  console.log(
-    "DEBUG: Using Script CBOR:",
-    contractScript.cbor.slice(0, 20) + "...",
-  );
   // Initialize MeshTxBuilder.
   // Prefer the LOCAL OfflineEvaluator (real Aiken VM, precise error messages)
   // when available (Node scripts/tests); fall back to Blockfrost's remote
@@ -350,9 +335,7 @@ export const buildReleaseTransaction = async (
   }); // Manually fetch and provide UTXOs to the builder
 
   const walletUtxos = await wallet.getUtxos();
-  console.log("wallet utxos", walletUtxos);
   const cleanUtxos = JSON.parse(JSON.stringify(walletUtxos));
-  console.log("cleaned", cleanUtxos);
   txBuilder.selectUtxosFrom(cleanUtxos); // Set Collateral (Required for Plutus V3 transactions)
 
   // Collateral is MANDATORY for Plutus script spends. Without it the tx body
@@ -378,12 +361,6 @@ export const buildReleaseTransaction = async (
     collateral =
       pureAda.find((u) => Number(u.output.amount[0].quantity) >= 5_000_000) ||
       pureAda.find((u) => Number(u.output.amount[0].quantity) >= 1_500_000);
-    if (collateral) {
-      console.log(
-        "ℹ️ Wallet has no reserved collateral; using a pure-ADA UTXO as collateral:",
-        collateral.input.txHash + "#" + collateral.input.outputIndex,
-      );
-    }
   }
 
   if (!collateral) {
@@ -416,7 +393,6 @@ export const buildReleaseTransaction = async (
   const redeemerData = createRedeemerData.release(milestoneId); // Setup spending transaction with proper script reference
 
   txBuilder.spendingPlutusScriptV3();
-  console.log(txBuilder.txIn);
   txBuilder.txIn(
     formattedUtxo.input.txHash,
     formattedUtxo.input.outputIndex,
@@ -441,10 +417,6 @@ export const buildReleaseTransaction = async (
     txBuilder.txOut(feeAddress, [
       { unit: "lovelace", quantity: feeAmount.toString() },
     ]);
-  } else if (feeAddress && feeAmount > 0) {
-    console.log(
-      `ℹ️ Skipping platform fee output of ${feeAmount} lovelace (below min-UTXO); fee stays with change.`,
-    );
   } // Output 3: Remaining funds back to script
 
   if (remainingAmount > 0) {
@@ -466,43 +438,117 @@ export const buildReleaseTransaction = async (
   return txHash;
 };
 
-// Helper: Find the escrow UTxO belonging to THIS contract by inspecting
-// each UTxO's inline datum CBOR. The correct UTxO's datum must contain the
-// hex-encoded milestone id AND the client's payment key hash. This prevents
-// spending an unrelated UTxO at the shared script address (there can be many
-// contracts' deposits at the same address), which makes the validator fail.
-export const findEscrowUtxo = (
-  utxos,
-  { milestoneId, clientAddress, depositTxHashes } = {},
-) => {
-  if (!utxos || utxos.length === 0) return null;
+// Read inline datum CBOR from either Mesh or Blockfrost UTxO shapes.
+export const getInlineDatumCbor = (utxo) =>
+  utxo?.output?.plutusData ||
+  utxo?.plutusData ||
+  utxo?.inline_datum ||
+  utxo?.inlineDatum ||
+  (typeof utxo?.datum === "string" && utxo.datum.length > 64
+    ? utxo.datum
+    : null) ||
+  null;
 
-  // STRONGEST match first: the app records every deposit's txHash in the
-  // contract document. A UTxO created by one of THIS contract's deposit
-  // transactions is unambiguous — datum-content matching alone is NOT,
-  // because two contracts can share milestone ids ("ms-001") and client.
-  if (depositTxHashes && depositTxHashes.length > 0) {
-    const hashes = depositTxHashes
-      .filter(Boolean)
-      .map((h) => String(h).toLowerCase());
-    const byDeposit = utxos.filter((u) => {
-      const tx = String(u?.input?.txHash || u?.txHash || "").toLowerCase();
-      return hashes.includes(tx);
-    });
-    if (byDeposit.length === 1) return byDeposit[0];
-    if (byDeposit.length > 1) {
-      // Multiple deposits: continue matching on datum content below,
-      // but only among this contract's own UTxOs.
-      utxos = byDeposit;
-    }
+const utf8FromHex = (hex, field) => {
+  if (typeof hex !== "string" || !/^[0-9a-f]*$/i.test(hex)) {
+    throw new Error(`Invalid ${field} bytes in escrow datum`);
+  }
+  const bytes = new Uint8Array(
+    hex.match(/.{1,2}/g)?.map((part) => Number.parseInt(part, 16)) || [],
+  );
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+};
+
+const requireField = (value, type, field) => {
+  if (!value || typeof value !== "object" || !(type in value)) {
+    throw new Error(`Malformed escrow datum: missing ${field}`);
+  }
+  return value[type];
+};
+
+/**
+ * Strictly decode the validator's EscrowDatum from inline CBOR. Payment-key
+ * hashes stay as hashes: callers must prove their known Bech32 addresses map
+ * to these values before constructing a spend.
+ */
+export const parseEscrowDatum = (inlineDatumCbor) => {
+  if (!inlineDatumCbor) throw new Error("Escrow UTxO has no inline datum");
+
+  const decoded = deserializeDatum(inlineDatumCbor);
+  if (String(decoded?.constructor) !== "0" || decoded?.fields?.length !== 9) {
+    throw new Error("Escrow UTxO has an incompatible datum shape");
   }
 
-  const toHex = (s) =>
-    Array.from(new TextEncoder().encode(String(s)))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+  const fields = decoded.fields;
+  const milestonesRaw = requireField(fields[3], "list", "milestones");
+  const milestones = milestonesRaw.map((item, index) => {
+    if (String(item?.constructor) !== "0" || item?.fields?.length !== 3) {
+      throw new Error(`Malformed escrow milestone at index ${index}`);
+    }
+    const paidConstructor = String(
+      requireField(item.fields[2], "constructor", `milestones[${index}].paid`),
+    );
+    if (paidConstructor !== "0" && paidConstructor !== "1") {
+      throw new Error(`Invalid paid flag at milestone index ${index}`);
+    }
+    return {
+      id: utf8FromHex(
+        requireField(item.fields[0], "bytes", `milestones[${index}].id`),
+        `milestones[${index}].id`,
+      ),
+      amount: Number(
+        requireField(item.fields[1], "int", `milestones[${index}].amount`),
+      ),
+      paid: paidConstructor === "1",
+    };
+  });
 
-  const milestoneHex = milestoneId ? toHex(milestoneId).toLowerCase() : null;
+  if (milestones.some((m) => !Number.isSafeInteger(m.amount) || m.amount <= 0)) {
+    throw new Error("Escrow datum contains an invalid milestone amount");
+  }
+
+  const expirationField = fields[7];
+  const expirationConstructor = String(expirationField?.constructor);
+  let expiration = null;
+  if (expirationConstructor === "0") {
+    expiration = Number(
+      requireField(expirationField.fields?.[0], "int", "expiration"),
+    );
+  } else if (expirationConstructor !== "1") {
+    throw new Error("Escrow datum contains an invalid expiration");
+  }
+
+  const parsed = {
+    clientHash: requireField(fields[0], "bytes", "client"),
+    freelancerHash: requireField(fields[1], "bytes", "freelancer"),
+    total_amount: Number(requireField(fields[2], "int", "total_amount")),
+    milestones,
+    contract_nonce: Number(
+      requireField(fields[4], "int", "contract_nonce"),
+    ),
+    fee_percent: Number(requireField(fields[5], "int", "fee_percent")),
+    feeAddressHash: requireField(fields[6], "bytes", "fee_address"),
+    expiration,
+    arbitratorHash: requireField(fields[8], "bytes", "arbitrator"),
+  };
+
+  if (
+    !Number.isSafeInteger(parsed.total_amount) ||
+    !Number.isSafeInteger(parsed.contract_nonce) ||
+    !Number.isSafeInteger(parsed.fee_percent)
+  ) {
+    throw new Error("Escrow datum contains unsafe numeric values");
+  }
+  return parsed;
+};
+
+// Find this contract's CURRENT escrow UTxO. Deposit hashes only identify the
+// initial output; continuation outputs are identified by immutable datum keys.
+export const findEscrowUtxo = (
+  utxos,
+  { milestoneId, clientAddress, contractNonce } = {},
+) => {
+  if (!utxos || utxos.length === 0) return null;
 
   let clientHash = null;
   try {
@@ -510,39 +556,32 @@ export const findEscrowUtxo = (
       ? resolvePaymentKeyHash(clientAddress).toLowerCase()
       : null;
   } catch {
-    clientHash = null;
+    return null;
   }
 
-  const inlineDatumOf = (u) =>
-    u?.output?.plutusData ||
-    u?.plutusData ||
-    u?.inline_datum ||
-    (typeof u?.datum === "string" && u.datum.length > 64 ? u.datum : null) ||
-    "";
-
-  const matches = utxos.filter((u) => {
-    const inline = String(inlineDatumOf(u)).toLowerCase();
-    if (!inline) return false;
-    const milestoneOk = milestoneHex ? inline.includes(milestoneHex) : true;
-    const clientOk = clientHash ? inline.includes(clientHash) : true;
-    return milestoneOk && clientOk;
+  const matches = utxos.flatMap((utxo) => {
+    try {
+      const datum = parseEscrowDatum(getInlineDatumCbor(utxo));
+      const identityMatches =
+        (!clientHash || datum.clientHash.toLowerCase() === clientHash) &&
+        (contractNonce == null ||
+          datum.contract_nonce === Number(contractNonce)) &&
+        (!milestoneId || datum.milestones.some((m) => m.id === milestoneId));
+      return identityMatches ? [{ utxo, datum }] : [];
+    } catch {
+      return [];
+    }
   });
 
-  // Prefer the largest matching UTxO (the funded escrow, not dust)
   if (matches.length > 1) {
-    matches.sort((a, b) => {
-      const lovelace = (u) => {
-        const amt = u?.output?.amount || u?.amount || [];
-        const l = Array.isArray(amt)
-          ? amt.find((x) => x.unit === "lovelace")
-          : null;
-        return l ? Number(l.quantity) : 0;
-      };
-      return lovelace(b) - lovelace(a);
-    });
+    throw new Error(
+      "Multiple escrow UTxOs match this contract nonce. Refusing an ambiguous spend.",
+    );
   }
+  if (matches.length === 0) return null;
 
-  return matches[0] || null;
+  // Attach decoded state without changing the provider's UTxO shape.
+  return { ...matches[0].utxo, escrowDatum: matches[0].datum };
 };
 
 // Shared setup for transactions that SPEND from the escrow script:
