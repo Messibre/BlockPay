@@ -34,6 +34,11 @@ export default function ContractDetail() {
   const { wallet, connected, address } = useWallet();
   const { success, error: showError } = useToast();
   const queryClient = useQueryClient();
+  const refreshContract = () =>
+    queryClient.invalidateQueries({
+      queryKey: ["contract", id],
+      exact: true,
+    });
   const [isDepositing, setIsDepositing] = useState(false);
   const [isApproving, setIsApproving] = useState({});
   const [isWalletPickerOpen, setIsWalletPickerOpen] = useState(false);
@@ -71,7 +76,7 @@ export default function ContractDetail() {
     queryFn: async () => {
       const data = await api.verifyDepositStatus(id);
       if (data.offchainState !== "PENDING") {
-        queryClient.invalidateQueries(["contract", id]);
+        refreshContract();
       }
       return data;
     },
@@ -121,23 +126,11 @@ export default function ContractDetail() {
   try {
     const scriptObject = { code: contractScript.cbor, version: "V3" };
     scriptAddress = resolvePlutusScriptAddress(scriptObject, 0);
-    console.log("🎯 UI forced to use current CBOR address:", scriptAddress);
-  } catch (e) {
-    console.error("❌ Failed to derive script address from CBOR:", e);
-    // Optional: keep your old fallback here just in case,
-    // but if the CBOR is valid, this is the only one that matters.
+  } catch (error) {
+    console.error("Failed to derive script address from CBOR:", error);
     scriptAddress =
       contractScript.address || import.meta.env.VITE_ESCROW_SCRIPT_ADDRESS;
   }
-
-  // Debug logs to help diagnose empty page issues
-  console.debug("ContractDetail render", {
-    id,
-    isAuthenticated,
-    user,
-    contract: contract || null,
-    scriptAddress,
-  });
 
   const handleDeposit = async () => {
     if (!connected || !wallet) {
@@ -263,7 +256,7 @@ export default function ContractDetail() {
       success(
         `Deposit submitted (TX: ${txHash.slice(0, 16)}...). Waiting for on-chain confirmation...`,
       );
-      queryClient.invalidateQueries(["contract", id]);
+      refreshContract();
     } catch (error) {
       console.error("Deposit error:", error);
       const serverMessage = error.response?.data?.message;
@@ -364,7 +357,7 @@ export default function ContractDetail() {
         success(
           `Milestone release recorded! TX: ${pendingTxHash.slice(0, 16)}...`,
         );
-        queryClient.invalidateQueries(["contract", id]);
+        refreshContract();
         return;
       }
 
@@ -483,7 +476,7 @@ export default function ContractDetail() {
         success(
           `Confirmed release reconciled! TX: ${currentTxHash.slice(0, 16)}...`,
         );
-        queryClient.invalidateQueries(["contract", id]);
+        refreshContract();
         return;
       }
 
@@ -576,7 +569,7 @@ export default function ContractDetail() {
       localStorage.removeItem(pendingKey);
 
       success(`Milestone approved & released! TX: ${txHash.slice(0, 16)}...`);
-      queryClient.invalidateQueries(["contract", id]);
+      refreshContract();
     } catch (error) {
       console.error("Approve error:", error);
       // Prefer backend-provided message/details for clarity
@@ -615,7 +608,7 @@ export default function ContractDetail() {
         description: submissionNote,
       });
       success("Work submitted for review!");
-      queryClient.invalidateQueries(["contract", id]);
+      refreshContract();
       setIsSubmitModalOpen(false);
     } catch (error) {
       console.error("Submit work error:", error);
@@ -735,7 +728,7 @@ export default function ContractDetail() {
         await api.refundContract(id, pendingTxHash);
         localStorage.removeItem(pendingKey);
         success(`Refund recorded! TX: ${pendingTxHash.slice(0, 16)}...`);
-        queryClient.invalidateQueries(["contract", id]);
+        refreshContract();
         return;
       }
 
@@ -771,7 +764,7 @@ export default function ContractDetail() {
       success(
         `Contract refunded - ${lovelaceToAda(refundLovelace)} ADA returned! TX: ${txHash.slice(0, 16)}...`,
       );
-      queryClient.invalidateQueries(["contract", id]);
+      refreshContract();
     } catch (error) {
       console.error("Refund error:", error);
       const resp = error.response?.data;
@@ -801,7 +794,7 @@ export default function ContractDetail() {
         await api.withdrawMilestone(id, milestoneId, pendingTxHash);
         localStorage.removeItem(pendingKey);
         success(`Withdrawal recorded! TX: ${pendingTxHash.slice(0, 16)}...`);
-        queryClient.invalidateQueries(["contract", id]);
+        refreshContract();
         return;
       }
 
@@ -843,7 +836,7 @@ export default function ContractDetail() {
       success(
         `Withdrew ${lovelaceToAda(withdrawLovelace)} ADA! TX: ${txHash.slice(0, 16)}...`,
       );
-      queryClient.invalidateQueries(["contract", id]);
+      refreshContract();
     } catch (error) {
       console.error("Withdraw error:", error);
       const resp = error.response?.data;
