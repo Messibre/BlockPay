@@ -1,58 +1,76 @@
-
 import Job from '../models/Job.js';
 import Contract from '../models/Contract.js';
 import Payment from '../models/Payment.js';
+import Proposal from '../models/Proposal.js';
 
 export const getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.userId;
 
-    // Active Jobs
-    const activeJobs = await Job.countDocuments({
-      clientId: userId,
-      status: { $in: ['open', 'in_progress'] },
-    });
+    if (req.userRole === 'freelancer') {
+      const [activeContracts, pendingProposals, freelancerContracts] = await Promise.all([
+        Contract.countDocuments({
+          freelancerId: userId,
+          offchainState: { $in: ['FUNDED', 'ACTIVE'] },
+        }),
+        Proposal.countDocuments({ freelancerId: userId, status: 'pending' }),
+        Contract.find({ freelancerId: userId }).distinct('_id'),
+      ]);
 
-    // Pending Contracts
-    const pendingContracts = await Contract.countDocuments({
-      clientId: userId,
-      offchainState: { $in: ['PENDING', 'FUNDED', 'ACTIVE'] },
-    });
+      const paymentMatch = {
+        contractId: { $in: freelancerContracts },
+        paymentType: { $in: ['release', 'payout'] },
+        status: 'CONFIRMED',
+      };
+      const [earnings] = await Payment.aggregate([
+        { $match: paymentMatch },
+        { $group: { _id: null, totalEarnings: { $sum: '$amountADA' } } },
+      ]);
+      const recentPayments = await Payment.find(paymentMatch)
+        .sort({ blockTime: -1, createdAt: -1 })
+        .limit(5)
+        .select('contractId milestoneId amountADA txHash explorerLink blockTime createdAt status')
+        .lean();
 
-    // Completed Contracts
-    const completedContracts = await Contract.countDocuments({
-      clientId: userId,
-      offchainState: 'COMPLETED',
-    });
+      return res.json({
+        jobsRecommended: 0,
+        activeContracts,
+        pendingProposals,
+        totalEarnings: earnings?.totalEarnings || 0,
+        recentPayments,
+      });
+    }
 
-    // Total Paid
-    // 1. Find all contracts for this client
-    const clientContracts = await Contract.find({ clientId: userId }).distinct('_id');
-    
-    // 2. Aggregate payments for these contracts
-    const layoutStats = await Payment.aggregate([
+    const [activeJobs, pendingContracts, completedContracts, clientContracts] =
+      await Promise.all([
+        Job.countDocuments({
+          clientId: userId,
+          status: { $in: ['open', 'in_progress'] },
+        }),
+        Contract.countDocuments({
+          clientId: userId,
+          offchainState: { $in: ['PENDING', 'FUNDED', 'ACTIVE'] },
+        }),
+        Contract.countDocuments({ clientId: userId, offchainState: 'COMPLETED' }),
+        Contract.find({ clientId: userId }).distinct('_id'),
+      ]);
+
+    const [paymentStats] = await Payment.aggregate([
       {
         $match: {
           contractId: { $in: clientContracts },
           paymentType: 'release',
+          status: 'CONFIRMED',
         },
       },
-      {
-        $group: {
-          _id: null,
-          totalPaid: { $sum: '$amountADA' },
-        },
-      },
+      { $group: { _id: null, totalPaid: { $sum: '$amountADA' } } },
     ]);
 
-    const totalPaid = layoutStats.length > 0 ? layoutStats[0].totalPaid : 0;
-
-    // Payment.amountADA is stored in ADA (not lovelace) - no conversion needed
-    res.json({
+    return res.json({
       activeJobs,
       pendingContracts,
       completedContracts,
-      totalPaid,
+      totalPaid: paymentStats?.totalPaid || 0,
     });
   } catch (error) {
     next(error);

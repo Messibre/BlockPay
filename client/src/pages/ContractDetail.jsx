@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@meshsdk/react";
@@ -34,13 +34,16 @@ export default function ContractDetail() {
   const { wallet, connected, address } = useWallet();
   const { success, error: showError } = useToast();
   const queryClient = useQueryClient();
-  const refreshContract = () =>
-    queryClient.invalidateQueries({
-      queryKey: ["contract", id],
-      exact: true,
-    });
+  const refreshContract = useCallback(
+    () =>
+      queryClient.invalidateQueries({
+        queryKey: ["contract", id],
+        exact: true,
+      }),
+    [id, queryClient],
+  );
   const [isDepositing, setIsDepositing] = useState(false);
-  const [isApproving, setIsApproving] = useState({});
+  const [releaseStates, setReleaseStates] = useState({});
   const [isWalletPickerOpen, setIsWalletPickerOpen] = useState(false);
   const [selectedWallet, setSelectedWallet] = useState(null);
   const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
@@ -53,6 +56,24 @@ export default function ContractDetail() {
   const [isRefunding, setIsRefunding] = useState(false);
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState({});
+  const isClient = user?.role === "client";
+  const isFreelancer = user?.role === "freelancer";
+
+  const recordRelease = useCallback(
+    async (milestoneId, txHash) => {
+      try {
+        const response = await api.approveMilestone(id, milestoneId, txHash);
+        return response?.status === "PENDING" ? "pending" : "confirmed";
+      } catch (recordingError) {
+        const isPending =
+          recordingError.response?.status === 202 ||
+          recordingError.response?.data?.status === "PENDING";
+        if (isPending) return "pending";
+        throw recordingError;
+      }
+    },
+    [id],
+  );
 
   const {
     data: contract,
@@ -62,9 +83,104 @@ export default function ContractDetail() {
     queryKey: ["contract", id],
     queryFn: () => api.getContract(id),
     retry: 1,
+    // Poll while any approval is awaiting backend confirmation so both parties
+    // see the milestone and earnings update without reloading the page.
+    refetchInterval: (query) =>
+      query.state.data?.releases?.some((release) => release.status === "PENDING")
+        ? 10_000
+        : false,
     // Only attempt fetch when user is authenticated (API requires auth)
     enabled: !!localStorage.getItem("token") || isAuthenticated,
   });
+
+  useEffect(() => {
+    if (!contract?.milestones) return;
+
+    setReleaseStates((current) => {
+      const next = { ...current };
+      for (const milestone of contract.milestones) {
+        const backendPending = (contract.releases || []).find(
+          (release) =>
+            release.milestoneId === milestone.id && release.status === "PENDING",
+        );
+        const localHash = isClient
+          ? localStorage.getItem(`pendingRelease:${id}:${milestone.id}`)
+          : null;
+        const txHash = localHash || backendPending?.txHash;
+        if (
+          txHash &&
+          milestone.status !== "approved" &&
+          next[milestone.id]?.status !== "error"
+        ) {
+          next[milestone.id] = { status: "pending", txHash };
+        } else if (milestone.status === "approved") {
+          delete next[milestone.id];
+          if (isClient) {
+            localStorage.removeItem(`pendingRelease:${id}:${milestone.id}`);
+          }
+        }
+      }
+      return next;
+    });
+  }, [contract, id, isClient]);
+
+  useEffect(() => {
+    if (!isClient) return undefined;
+
+    const pendingEntries = Object.entries(releaseStates).filter(
+      ([, release]) => release.status === "pending" && release.txHash,
+    );
+    if (pendingEntries.length === 0) return undefined;
+
+    let active = true;
+    let reconciling = false;
+    const reconcile = async () => {
+      if (reconciling) return;
+      reconciling = true;
+      try {
+        await Promise.all(
+          pendingEntries.map(async ([milestoneId, release]) => {
+            try {
+              const result = await recordRelease(milestoneId, release.txHash);
+              if (!active || result === "pending") return;
+              localStorage.removeItem(`pendingRelease:${id}:${milestoneId}`);
+              setReleaseStates((current) => {
+                const next = { ...current };
+                delete next[milestoneId];
+                return next;
+              });
+              refreshContract();
+            } catch (reconciliationError) {
+              if (!active) return;
+              setReleaseStates((current) => ({
+                ...current,
+                [milestoneId]: {
+                  status: "error",
+                  txHash: release.txHash,
+                  message:
+                    reconciliationError.response?.data?.message ||
+                    reconciliationError.message,
+                },
+              }));
+              showError(
+                reconciliationError.response?.data?.message ||
+                  "Release verification failed. No new payment was submitted.",
+              );
+            }
+          }),
+        );
+      } finally {
+        reconciling = false;
+      }
+    };
+
+    reconcile();
+    const intervalId = window.setInterval(reconcile, 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [id, isClient, recordRelease, refreshContract, releaseStates, showError]);
 
   // While a deposit is PENDING on-chain, poll the backend which re-verifies
   // it against Blockfrost and flips the contract to FUNDED once confirmed.
@@ -109,8 +225,6 @@ export default function ContractDetail() {
     );
   }
 
-  const isClient = user?.role === "client";
-  const isFreelancer = user?.role === "freelancer";
   const needsDeposit =
     isClient && contract && contract.offchainState === "PENDING";
   const isFunded =
@@ -334,40 +448,26 @@ export default function ContractDetail() {
       return;
     }
 
-    setIsApproving({ ...isApproving, [milestoneId]: true });
+    setReleaseStates((current) => ({
+      ...current,
+      [milestoneId]: { status: "submitting" },
+    }));
     // If a release tx for this milestone was already submitted on-chain but
-    // the backend failed to record it (e.g. it was down or rejected the
-    // recording), retry ONLY the recording - never build a second release
-    // transaction for the same milestone.
+    // the backend has not confirmed it yet, retry ONLY the recording. Never
+    // build a second release transaction for the same milestone.
     const pendingKey = `pendingRelease:${id}:${milestoneId}`;
-    const recordReleaseWithRetry = async (txHash) => {
-      const maxAttempts = 6;
-      const retryDelayMs = 5_000;
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        try {
-          return await api.approveMilestone(id, milestoneId, txHash);
-        } catch (recordingError) {
-          const isPending =
-            recordingError.response?.status === 202 ||
-            recordingError.response?.data?.status === "PENDING";
-          if (!isPending) throw recordingError;
-          if (attempt === maxAttempts) {
-            const pendingError = new Error(
-              "Release submitted successfully and is still being indexed. Please retry shortly; no new payment will be made.",
-            );
-            pendingError.code = "RELEASE_INDEXING";
-            throw pendingError;
-          }
-          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-        }
-      }
-    };
 
     try {
       const pendingTxHash = localStorage.getItem(pendingKey);
       if (pendingTxHash) {
-        await recordReleaseWithRetry(pendingTxHash);
+        const result = await recordRelease(milestoneId, pendingTxHash);
+        if (result === "pending") {
+          setReleaseStates((current) => ({
+            ...current,
+            [milestoneId]: { status: "pending", txHash: pendingTxHash },
+          }));
+          return;
+        }
         localStorage.removeItem(pendingKey);
         success(
           `Milestone release recorded! TX: ${pendingTxHash.slice(0, 16)}...`,
@@ -477,7 +577,15 @@ export default function ContractDetail() {
         // The chain already accepted this release while Mongo remained stale.
         // Reconcile that confirmed transaction instead of submitting a
         // duplicate Release that the validator must reject.
-        await recordReleaseWithRetry(currentTxHash);
+        localStorage.setItem(pendingKey, currentTxHash);
+        const result = await recordRelease(milestoneId, currentTxHash);
+        if (result === "pending") {
+          setReleaseStates((current) => ({
+            ...current,
+            [milestoneId]: { status: "pending", txHash: currentTxHash },
+          }));
+          return;
+        }
         localStorage.removeItem(pendingKey);
         success(
           `Confirmed release reconciled! TX: ${currentTxHash.slice(0, 16)}...`,
@@ -564,37 +672,41 @@ export default function ContractDetail() {
       // (and double-spending) the release transaction.
       localStorage.setItem(pendingKey, txHash);
 
-      // 7. Record release with backend. A pending verification is retried
-      // without rebuilding or resubmitting the on-chain release.
-      await recordReleaseWithRetry(txHash);
+      // 7. Ask the backend to verify the release. If the chain index is still
+      // catching up, keep a durable pending state and reconcile in the background.
+      const result = await recordRelease(milestoneId, txHash);
+      if (result === "pending") {
+        setReleaseStates((current) => ({
+          ...current,
+          [milestoneId]: { status: "pending", txHash },
+        }));
+        return;
+      }
       localStorage.removeItem(pendingKey);
 
       success(`Milestone approved & released! TX: ${txHash.slice(0, 16)}...`);
       refreshContract();
     } catch (error) {
       console.error("Approve error:", error);
-      // Prefer backend-provided message/details for clarity
       const resp = error.response?.data;
       const details = resp?.details ? resp.details.join("; ") : null;
-      let msg =
-        details ||
-        resp?.message ||
-        error.message ||
-        "Failed to approve milestone";
-      // If the on-chain release succeeded but backend recording failed, make
-      // clear the funds already moved and a retry will only re-record.
-      if (localStorage.getItem(pendingKey)) {
-        msg =
-          error.code === "RELEASE_INDEXING"
-            ? error.message
-            : `The payment was released on-chain, but recording it failed: ${msg} - click Approve again to retry recording (no new payment will be made).`;
-      }
-      showError(msg);
-      // Log full response for debugging
-       
+      const message =
+        details || resp?.message || error.message || "Failed to approve milestone";
+      const pendingTxHash = localStorage.getItem(pendingKey);
+      setReleaseStates((current) => ({
+        ...current,
+        [milestoneId]: pendingTxHash
+          ? { status: "error", txHash: pendingTxHash, message }
+          : { status: "idle", message },
+      }));
+      showError(message);
       console.error("Approve error response:", resp || error);
     } finally {
-      setIsApproving({ ...isApproving, [milestoneId]: false });
+      setReleaseStates((current) =>
+        current[milestoneId]?.status === "submitting"
+          ? { ...current, [milestoneId]: { status: "idle" } }
+          : current,
+      );
     }
   };
 
@@ -887,6 +999,28 @@ export default function ContractDetail() {
     return (
       !!datumMilestone?.paid && !confirmedPayoutMilestoneIds.has(milestone.id)
     );
+  };
+  const getMilestoneRelease = (milestoneId) =>
+    (contract?.releases || []).find(
+      (release) =>
+        release.milestoneId === milestoneId &&
+        (release.paymentType === "release" || release.paymentType === "payout"),
+    );
+  const getApprovalState = (milestoneId) => {
+    const localState = releaseStates[milestoneId]?.status;
+    const backendRelease = getMilestoneRelease(milestoneId);
+    if (localState === "submitting" || localState === "pending") return localState;
+    if (backendRelease?.status === "PENDING") return "pending";
+    return localState || "idle";
+  };
+  const getNetEarningsAda = (milestone) => {
+    const confirmedRelease = getMilestoneRelease(milestone.id);
+    if (confirmedRelease?.status === "CONFIRMED") {
+      return Number(confirmedRelease.amountADA).toFixed(2);
+    }
+    const feePercent = Number(contract?.datum?.feePercent || 100);
+    const feeLovelace = Math.floor((Number(milestone.amount) * feePercent) / 10000);
+    return lovelaceToAda(Number(milestone.amount) - feeLovelace).toFixed(2);
   };
 
   return (
@@ -1193,22 +1327,51 @@ export default function ContractDetail() {
                     {isClient &&
                       milestone.status === "submitted" &&
                       isFunded && (
-                        <Button
-                          variant="success"
-                          className={styles.actionButton}
-                          onClick={() => handleApproveMilestone(milestone.id)}
-                          disabled={isApproving[milestone.id]}
-                        >
-                          {isApproving[milestone.id]
-                            ? "Processing..."
-                            : "Approve & Release Payment"}
-                        </Button>
+                        <>
+                          <Button
+                            variant="success"
+                            className={styles.actionButton}
+                            onClick={() => handleApproveMilestone(milestone.id)}
+                            disabled={
+                              getApprovalState(milestone.id) === "submitting" ||
+                              getApprovalState(milestone.id) === "pending"
+                            }
+                          >
+                            {getApprovalState(milestone.id) === "submitting"
+                              ? "Submitting release..."
+                              : getApprovalState(milestone.id) === "pending"
+                                ? "Pending approval"
+                                : releaseStates[milestone.id]?.status === "error"
+                                  ? "Retry approval recording"
+                                  : "Approve & Release Payment"}
+                          </Button>
+                          {getApprovalState(milestone.id) === "pending" && (
+                            <p className={styles.approvalPending}>
+                              Payment was submitted on-chain. BlockPay is confirming it
+                              automatically; do not submit another transaction.
+                            </p>
+                          )}
+                        </>
                       )}
-                    {isClient && milestone.status === "approved" && (
+                    {milestone.status === "approved" && isClient && (
                       <p className={styles.milestoneApproved}>
-                        ✓ Approved - Payment released to freelancer
+                        Approved — {getNetEarningsAda(milestone)} ADA released to the
+                        freelancer
                       </p>
                     )}
+                    {milestone.status === "approved" && isFreelancer && (
+                      <p className={styles.milestoneApproved}>
+                        Earnings received — {getNetEarningsAda(milestone)} ADA
+                      </p>
+                    )}
+                    {isFreelancer &&
+                      milestone.status === "submitted" &&
+                      getMilestoneRelease(milestone.id)?.status === "PENDING" && (
+                        <p className={styles.approvalPending}>
+                          Client approval is pending on-chain confirmation. Your earnings
+                          will appear here automatically once verified.
+                        </p>
+                      )}
                     {canWithdrawMilestone(milestone) && (
                       <>
                         <p className={styles.walletWarning}>

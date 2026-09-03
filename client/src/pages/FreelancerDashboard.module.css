@@ -168,6 +168,47 @@
   color: var(--text-primary);
 }
 
+.paymentList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.paymentItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.paymentItem div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.paymentItem strong {
+  color: var(--success);
+  font-family: var(--font-mono);
+}
+
+.paymentItem span,
+.paymentItem a {
+  color: var(--text-tertiary);
+  font-size: 0.875rem;
+}
+
+.paymentItem a:hover {
+  color: var(--color-primary);
+}
+
 /* Empty State */
 .empty {
   color: var(--text-tertiary);
