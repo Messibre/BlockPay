@@ -91,7 +91,7 @@
 .roleBadge {
   display: inline-flex;
   background: var(--color-primary-glow);
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.25rem 0.625rem;
@@ -170,7 +170,6 @@
 
 .featureCard:hover {
   border-color: var(--border-color-strong);
-  transform: translateY(-4px);
   box-shadow: var(--shadow-lg);
 }
 
@@ -185,7 +184,7 @@
   margin: 0 auto 1.25rem;
   font-weight: 700;
   font-size: 1.125rem;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   font-family: var(--font-display);
 }
 
@@ -208,7 +207,7 @@
 }
 
 .ctaCard {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-2xl);
   padding: 3.5rem 2rem;

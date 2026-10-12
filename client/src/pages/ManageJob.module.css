@@ -59,7 +59,7 @@
 .statValue {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   font-family: var(--font-mono);
 }
 
@@ -97,7 +97,7 @@
 
 .proposalCard:hover {
   border-color: var(--color-primary-glow);
-  box-shadow: 0 4px 12px -2px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.15);
+  box-shadow: var(--shadow-md);
 }
 
 .proposalHeader {
@@ -141,21 +141,21 @@
 }
 
 .status.pending {
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--warning-bg);
   color: var(--warning);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
 }
 
 .status.accepted {
-  background: rgba(16, 185, 129, 0.1);
+  background: var(--success-bg);
   color: var(--success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
 }
 
 .status.rejected {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--error-bg);
   color: var(--error);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid color-mix(in srgb, var(--error) 25%, transparent);
 }
 
 .proposalContent {
@@ -182,7 +182,7 @@
 
 .link {
   display: block;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   text-decoration: none;
   margin: 0.5rem 0;
   transition: color 0.2s;

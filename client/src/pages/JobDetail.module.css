@@ -68,7 +68,7 @@
 
 .status {
   background: var(--color-primary-glow);
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   padding: 0.25rem 0.875rem;
   border-radius: var(--radius-full);
   font-size: 0.8125rem;
@@ -101,7 +101,7 @@
 }
 
 .budget strong {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   font-size: 1.25rem;
   font-weight: 700;
 }

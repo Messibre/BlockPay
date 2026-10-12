@@ -76,7 +76,7 @@
 .button {
   width: 100%;
   background: var(--color-primary);
-  color: var(--text-inverse);
+  color: var(--on-primary);
   padding: 0.875rem 1.5rem;
   border: none;
   border-radius: var(--radius-md);
@@ -89,8 +89,6 @@
 
 .button:hover {
   background: var(--color-primary-hover);
-  box-shadow: 0 0 20px var(--color-primary-glow);
-  transform: translateY(-1px);
 }
 
 .button:active {
@@ -110,7 +108,7 @@
   border-radius: var(--radius-md);
   margin-bottom: 1.25rem;
   font-size: 0.9375rem;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid color-mix(in srgb, var(--error) 25%, transparent);
   line-height: 1.5;
 }
 
@@ -128,7 +126,7 @@
 }
 
 .formFooter a {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   font-weight: 500;
 }
 

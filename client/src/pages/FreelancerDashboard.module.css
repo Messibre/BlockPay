@@ -131,7 +131,7 @@
 .statValue {
   font-size: 2.5rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   margin-bottom: 0.75rem;
   line-height: 1;
   font-family: var(--font-display);
@@ -144,7 +144,7 @@
 }
 
 .statCard a:hover {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 /* Sections Layout */
@@ -206,7 +206,7 @@
 }
 
 .paymentItem a:hover {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 /* Empty State */
