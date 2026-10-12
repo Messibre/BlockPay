@@ -10,7 +10,6 @@
   animation: slideIn var(--transition-slow) cubic-bezier(0.16, 1, 0.3, 1);
   min-width: 320px;
   max-width: 440px;
-  backdrop-filter: blur(8px);
 }
 
 @keyframes slideIn {
@@ -72,40 +71,23 @@
 .success {
   background-color: var(--success-bg);
   color: var(--success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
 }
 
 .error {
   background-color: var(--error-bg);
   color: var(--error);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid color-mix(in srgb, var(--error) 25%, transparent);
 }
 
 .warning {
   background-color: var(--warning-bg);
   color: var(--warning);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
 }
 
 .info {
   background-color: var(--info-bg);
   color: var(--info);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-/* Light theme adjustments */
-[data-theme="light"] .success {
-  background-color: #ecfdf5;
-}
-
-[data-theme="light"] .error {
-  background-color: #fef2f2;
-}
-
-[data-theme="light"] .warning {
-  background-color: #fffbeb;
-}
-
-[data-theme="light"] .info {
-  background-color: #eff6ff;
+  border: 1px solid color-mix(in srgb, var(--info) 25%, transparent);
 }

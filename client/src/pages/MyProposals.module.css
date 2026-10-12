@@ -43,7 +43,7 @@
 }
 
 .empty h2 {
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 0.5rem;
 }
 
@@ -98,18 +98,18 @@
 }
 
 .status.pending {
-  background-color: #fff3cd;
-  color: #856404;
+  background-color: var(--warning-bg);
+  color: var(--warning);
 }
 
 .status.accepted {
-  background-color: #d4edda;
-  color: #155724;
+  background-color: var(--success-bg);
+  color: var(--success);
 }
 
 .status.rejected {
-  background-color: #f8d7da;
-  color: #721c24;
+  background-color: var(--error-bg);
+  color: var(--error);
 }
 
 .proposalContent {
@@ -134,7 +134,7 @@
 
 .date,
 .jobStatus {
-  color: #999;
+  color: var(--text-tertiary);
   font-size: 0.85rem;
 }
 

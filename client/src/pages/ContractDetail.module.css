@@ -78,15 +78,15 @@
 }
 
 .pending {
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--warning-bg);
   color: var(--warning);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
 }
 
 .funded, .active {
-  background: rgba(16, 185, 129, 0.1);
+  background: var(--success-bg);
   color: var(--success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
 }
 
 .completed, .paid {
@@ -96,16 +96,16 @@
 }
 
 .cancelled, .failed {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--error-bg);
   color: var(--error);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid color-mix(in srgb, var(--error) 25%, transparent);
 }
 
 /* Deposit Section */
 .depositSection {
   margin-top: 2.5rem;
   border: 1px solid var(--border-color);
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.05) 100%);
+  background: var(--bg-secondary);
 }
 
 .depositInfo {
@@ -117,7 +117,7 @@
 
 .walletWarning {
   color: var(--warning);
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--warning-bg);
   padding: 1rem;
   border-radius: var(--radius-md);
   margin-bottom: 1.5rem;
@@ -222,7 +222,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 1rem;
-  background: rgba(16, 185, 129, 0.1);
+  background: var(--success-bg);
   border-radius: var(--radius-md);
 }
 
@@ -232,8 +232,8 @@
   line-height: 1.5;
   margin-top: 0.75rem;
   padding: 1rem;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: var(--warning-bg);
+  border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
   border-radius: var(--radius-md);
 }
 

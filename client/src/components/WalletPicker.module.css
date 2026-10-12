@@ -6,7 +6,6 @@
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -72,7 +71,7 @@
 
 .walletItem:hover {
   border-color: var(--color-primary);
-  background: rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.1);
+  background: var(--color-primary-glow);
 }
 
 .walletIcon {

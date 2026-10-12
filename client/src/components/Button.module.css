@@ -99,7 +99,8 @@
 }
 
 .danger:hover {
-  background: #dc2626;
+  background: var(--error);
+  filter: brightness(0.9);
   box-shadow: var(--shadow-md);
 }
 

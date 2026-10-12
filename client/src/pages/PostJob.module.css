@@ -92,9 +92,9 @@ h1 {
 }
 
 .addTagBtn:hover {
-  background-color: var(--accent-primary);
-  color: white;
-  border-color: var(--accent-primary);
+  background-color: var(--color-primary);
+  color: var(--on-primary);
+  border-color: var(--color-primary);
 }
 
 .tags {
@@ -107,7 +107,7 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.1);
+  background-color: var(--color-primary-glow);
   color: var(--color-primary-text);
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
@@ -146,12 +146,12 @@ h1 {
 }
 
 .error {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: var(--error-bg);
   color: var(--error);
   padding: 1rem;
   border-radius: var(--radius-md);
   margin-bottom: 2rem;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid color-mix(in srgb, var(--error) 25%, transparent);
 }
 
 @media (max-width: 768px) {

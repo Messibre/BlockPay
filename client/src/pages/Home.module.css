@@ -207,7 +207,7 @@
 }
 
 .ctaCard {
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-2xl);
   padding: 3.5rem 2rem;
