@@ -2,10 +2,10 @@
 
 .card {
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  border: 2px solid var(--border-color-strong);
   border-radius: var(--radius-xl);
   padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-lg);
   transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
@@ -20,7 +20,6 @@
 .card.clickable:hover {
   border-color: var(--border-color-strong);
   box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
 }
 
 .card.clickable:active {
@@ -35,22 +34,20 @@
 
 /* Glass Variant */
 .glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color-strong);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Elevated Variant */
 .elevated {
   background: var(--bg-elevated);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-xl);
 }
 
 /* Bordered Variant - More prominent border */
 .bordered {
-  border: 1px solid var(--border-color-strong);
+  border: 2px solid var(--border-color-strong);
 }
 
 /* Interactive highlight on hover */

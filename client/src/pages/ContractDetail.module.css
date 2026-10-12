@@ -90,9 +90,9 @@
 }
 
 .completed, .paid {
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--color-primary);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: var(--color-primary-glow);
+  color: var(--color-primary-text);
+  border: 1px solid var(--border-color-strong);
 }
 
 .cancelled, .failed {
@@ -131,7 +131,7 @@
   width: 100%;
   padding: 1rem !important;
   font-size: 1.1rem !important;
-  box-shadow: 0 4px 12px var(--color-primary-glow);
+  box-shadow: var(--shadow-md);
 }
 
 .contractInfo {

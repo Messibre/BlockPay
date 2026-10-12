@@ -12,15 +12,9 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   transition: background var(--transition-base);
-}
-
-[data-theme="light"] .header {
-  background: rgba(255, 255, 255, 0.9);
 }
 
 .container {
@@ -117,7 +111,7 @@
 }
 
 .themeToggle:hover {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   border-color: var(--color-primary);
   background: var(--color-primary-glow);
 }
@@ -156,14 +150,13 @@
   border-radius: var(--radius-md);
   background: var(--color-primary);
   border: none;
-  color: var(--text-inverse);
+  color: var(--on-primary);
   transition: all var(--transition-fast);
   cursor: pointer;
 }
 
 .buttonSmall:hover {
   background: var(--color-primary-hover);
-  box-shadow: 0 0 16px var(--color-primary-glow);
 }
 
 /* Mobile Menu Toggle */
@@ -234,7 +227,7 @@
 
 .mobileNavLinks a:hover {
   background: var(--bg-tertiary);
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 .mobileUser,
@@ -267,7 +260,7 @@
 
 .buttonSecondary:hover {
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 /* Main Content Area */

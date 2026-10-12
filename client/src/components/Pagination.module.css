@@ -43,7 +43,7 @@
 
 .button.active {
   background: var(--color-primary);
-  color: var(--text-inverse);
+  color: var(--on-primary);
   border-color: var(--color-primary);
 }
 

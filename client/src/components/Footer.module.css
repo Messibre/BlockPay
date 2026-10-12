@@ -40,7 +40,6 @@
   height: 8px;
   background: var(--color-primary);
   border-radius: 2px;
-  box-shadow: 0 0 12px var(--color-primary-glow);
 }
 
 .branding p {
@@ -81,7 +80,7 @@
 }
 
 .links a:hover {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 /* Bottom Section */
@@ -135,7 +134,7 @@
 
 .socialLinks a:hover {
   background: var(--color-primary);
-  color: var(--text-inverse);
+  color: var(--on-primary);
 }
 
 /* Responsive */

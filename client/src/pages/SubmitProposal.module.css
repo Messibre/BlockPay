@@ -17,7 +17,7 @@
 
 .loadingContainer p {
   margin-top: 1rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .errorContainer h2 {
@@ -34,18 +34,18 @@
 
 .jobInfo h2 {
   margin: 0 0 0.5rem 0;
-  color: #0066cc;
+  color: var(--color-primary-text);
 }
 
 .budget {
   font-size: 1.1rem;
   font-weight: 500;
-  color: #0066cc;
+  color: var(--color-primary-text);
   margin: 0.5rem 0;
 }
 
 .description {
-  color: #666;
+  color: var(--text-secondary);
   margin-top: 0.5rem;
 }
 

@@ -108,7 +108,7 @@ h1 {
   align-items: center;
   gap: 0.5rem;
   background-color: rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.1);
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
   font-size: 0.85rem;
